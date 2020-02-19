@@ -1,0 +1,98 @@
+import torch
+import torch.nn.functional as F
+from torch import nn
+import argparse
+from itertools import chain
+
+
+class DeepInfoMax(nn.Module):
+
+    def __init__(self, nb_samples=1, layers_size = [25,10], out_channels = 5, emb_size = 10,data_dir ='.'):
+        super(DeepInfoMax, self).__init__()
+
+        
+        self.sample = nb_samples
+        self.out_channels = out_channels
+        self.emb_size = emb_size
+        
+        self.conv1 = nn.Conv1d(in_channels = 20,out_channels = 10,kernel_size = 5,stride = 1)
+        self.conv2 = nn.Conv1d(in_channels = 10,out_channels = self.out_channels, kernel_size=14,stride = 1)
+        
+
+        layers = []
+        dim = [(10*(27-5+1))+self.out_channels*self.emb_size] + layers_size # Adding the emb size*out_channels
+
+        for size_in, size_out in zip(dim[:-1], dim[1:]):
+            layer = nn.Linear(size_in, size_out)
+            layers.append(layer)
+
+        self.mlp_layers = nn.ModuleList(layers)
+
+        # Last layer
+        self.last_layer = nn.Linear(dim[-1], 2)
+
+
+    def get_feature_map(self, x1):
+
+        fm = self.conv1(x1)
+        fm = fm.reshape((fm.shape[0], fm.shape[1]*fm.shape[2]))
+        
+        return fm
+
+    def get_feature_vector(self, x1):
+
+        fv = self.conv1(x1)
+        fv = self.conv2(fv)
+        fm = fm.reshape((fm.shape[0], fm.shape[1]*fm.shape[2]))
+        self.fm = fm
+        return fm
+
+    def forward(self,  x1, x2):
+
+        # Get the feature maps
+        fm1, fm2 = self.get_feature_map(x1), self.get_feature_map(x2)
+        fv1, fv2 = self.get_feature_vector(x1), self.get_feature_vector(x1)
+
+
+
+
+        #import pdb; pdb.set_trace()
+        #emb_1 = emb_1.permute(1,0,2)
+        #emb_1 = emb_1.squeeze()
+        #emb_2 = emb_2.squeeze()
+        #emb_2 = emb_2.view(-1,2)
+        #if not emb_1.shape == emb_2.shape:
+        #    import pdb; pdb.set_trace()
+        mlp_input_1 = torch.cat([fm1, fv1], 1)
+        
+        # Forward pass for real
+        for layer in self.mlp_layers:
+            mlp_input_1 = layer(mlp_input_1)
+            mlp_input_1 = F.tanh(mlp_input_1)
+        mlp_output_1 = self.last_layer(mlp_input_1)
+
+        mlp_input_2 = torch.cat([fm2, fv1], 1)
+        
+        # Forward pass for fake
+        for layer in self.mlp_layers:
+            mlp_input_2 = layer(mlp_input_2)
+            mlp_input_2 = F.tanh(mlp_input_2)
+        mlp_output_2 = self.last_layer(mlp_input_2)
+
+
+        return mlp_output_1, mlp_output_2
+
+
+
+def get_model(opt, inputs_size, model_state=None):
+
+    if opt.model == 'CNN':
+        model_class = DeepInfoMax
+        model = model_class(layers_size=opt.layers_size, out_channels=opt.out_channels, emb_size=opt.emb_size, data_dir = opt.data_dir)
+    else:
+        raise NotImplementedError()
+
+    if model_state is not None:
+        model.load_state_dict(model_state)
+
+    return model
