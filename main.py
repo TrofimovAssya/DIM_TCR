@@ -24,7 +24,7 @@ def build_parser():
     ### Dataset specific options
     parser.add_argument('--data-dir', default='./data/', help='The folder contaning the dataset.')
     parser.add_argument('--data-file', default='.', help='The data file with the dataset.')
-    parser.add_argument('--dataset', choices=['kmer'], default='kmer', help='Which dataset to use.')
+    parser.add_argument('--dataset', choices=['tcr'], default='tcr', help='Which dataset to use.')
 
     # Model specific options
     parser.add_argument('--layers-size', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
@@ -72,7 +72,7 @@ def main(argv=None):
 
     # Creating a model
     print ("Getting the model...")
-    my_model, optimizer, epoch, opt = monitoring.load_checkpoint(exp_dir, opt, dataset.dataset.input_size(), )
+    my_model, optimizer, epoch, opt = monitoring.load_checkpoint(exp_dir, opt )
 
     criterion = torch.nn.NLLLoss()
 
