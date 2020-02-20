@@ -54,8 +54,6 @@ class DeepInfoMax(nn.Module):
         fv1, fv2 = self.get_feature_vector(x1), self.get_feature_vector(x1)
 
 
-
-
         #import pdb; pdb.set_trace()
         #emb_1 = emb_1.permute(1,0,2)
         #emb_1 = emb_1.squeeze()
@@ -63,21 +61,25 @@ class DeepInfoMax(nn.Module):
         #emb_2 = emb_2.view(-1,2)
         #if not emb_1.shape == emb_2.shape:
         #    import pdb; pdb.set_trace()
-        mlp_input_1 = torch.cat([fm1, fv1], 1)
+        
         
         # Forward pass for real
+        mlp_input_1 = torch.cat([fm1, fv1], 1)
         for layer in self.mlp_layers:
             mlp_input_1 = layer(mlp_input_1)
             mlp_input_1 = F.tanh(mlp_input_1)
         mlp_output_1 = self.last_layer(mlp_input_1)
+        mlp_output_1 = self.softmax(mlp_output_1)
 
-        mlp_input_2 = torch.cat([fm2, fv1], 1)
+        
         
         # Forward pass for fake
+        mlp_input_2 = torch.cat([fm2, fv1], 1)
         for layer in self.mlp_layers:
             mlp_input_2 = layer(mlp_input_2)
             mlp_input_2 = F.tanh(mlp_input_2)
         mlp_output_2 = self.last_layer(mlp_input_2)
+        mlp_output_2 = self.softmax(mlp_output_2)
 
 
         return mlp_output_1, mlp_output_2
