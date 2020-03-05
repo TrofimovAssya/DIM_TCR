@@ -10,17 +10,17 @@ class DeepInfoMax(nn.Module):
     def __init__(self, nb_samples=1, layers_size = [25,10], out_channels = 5, emb_size = 10,data_dir ='.'):
         super(DeepInfoMax, self).__init__()
 
-        
         self.sample = nb_samples
         self.out_channels = out_channels
         self.emb_size = emb_size
-        
-        self.conv1 = nn.Conv1d(in_channels = 20,out_channels = 10,kernel_size = 5,stride = 1)
-        self.conv2 = nn.Conv1d(in_channels = 10,out_channels = self.out_channels, kernel_size=14,stride = 1)
-        
+        self.conv1 = nn.Conv1d(in_channels = 20,out_channels = 10,kernel_size = 15,stride = 1)
+        self.conv2 = nn.Conv1d(in_channels = 10,out_channels = self.out_channels, kernel_size=12,stride = 1)
 
+        #self.conv1 = nn.Conv1d(in_channels = 20,out_channels = 10,kernel_size = 5,stride = 1)
+        #self.conv2 = nn.Conv1d(in_channels = 10,out_channels = self.out_channels, kernel_size=14,stride = 1)
         layers = []
-        dim = [(10*(27-5+1))+self.out_channels*self.emb_size] + layers_size # Adding the emb size*out_channels
+        #dim = [(10*(27-5+1))+self.out_channels*self.emb_size] + layers_size # Adding the emb size*out_channels
+        dim = [(10*(27-15+1))+self.emb_size] + layers_size # Adding the emb size*out_channels
 
         for size_in, size_out in zip(dim[:-1], dim[1:]):
             layer = nn.Linear(size_in, size_out)
@@ -30,21 +30,22 @@ class DeepInfoMax(nn.Module):
 
         # Last layer
         self.last_layer = nn.Linear(dim[-1], 2)
+        self.softmax = nn.Softmax(dim=1)
 
 
     def get_feature_map(self, x1):
 
         fm = self.conv1(x1)
         fm = fm.reshape((fm.shape[0], fm.shape[1]*fm.shape[2]))
-        
         return fm
 
     def get_feature_vector(self, x1):
 
         fv = self.conv1(x1)
-        fv = self.conv2(fv)
+        fm = self.conv2(fv)
+        #import pdb; pdb.set_trace()
+
         fm = fm.reshape((fm.shape[0], fm.shape[1]*fm.shape[2]))
-        self.fm = fm
         return fm
 
     def forward(self,  x1, x2):
@@ -52,17 +53,15 @@ class DeepInfoMax(nn.Module):
         # Get the feature maps
         fm1, fm2 = self.get_feature_map(x1), self.get_feature_map(x2)
         fv1, fv2 = self.get_feature_vector(x1), self.get_feature_vector(x1)
+        self.fv = fv1
 
 
-        #import pdb; pdb.set_trace()
         #emb_1 = emb_1.permute(1,0,2)
         #emb_1 = emb_1.squeeze()
         #emb_2 = emb_2.squeeze()
         #emb_2 = emb_2.view(-1,2)
         #if not emb_1.shape == emb_2.shape:
         #    import pdb; pdb.set_trace()
-        
-        
         # Forward pass for real
         mlp_input_1 = torch.cat([fm1, fv1], 1)
         for layer in self.mlp_layers:
@@ -71,8 +70,6 @@ class DeepInfoMax(nn.Module):
         mlp_output_1 = self.last_layer(mlp_input_1)
         mlp_output_1 = self.softmax(mlp_output_1)
 
-        
-        
         # Forward pass for fake
         mlp_input_2 = torch.cat([fm2, fv1], 1)
         for layer in self.mlp_layers:

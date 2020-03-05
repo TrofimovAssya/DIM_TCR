@@ -75,6 +75,7 @@ def main(argv=None):
     my_model, optimizer, epoch, opt = monitoring.load_checkpoint(exp_dir, opt )
 
     criterion = torch.nn.NLLLoss()
+    criterion = torch.nn.BCELoss()
 
 
     os.mkdir(f'{exp_dir}/kmer_embs/') #storing the representation
@@ -85,10 +86,12 @@ def main(argv=None):
 
     # The training.
     print ("Start training.")
+    loss_monitoring = []
     #monitoring and predictions
     for t in range(epoch, opt.epoch):
 
         start_timer = time.time()
+        loss_epoch = []
         for no_b, mini in enumerate(dataset):
 
             inputs_tcr = mini[0]
@@ -96,9 +99,15 @@ def main(argv=None):
             inputs_tcr_pos = Variable(inputs_tcr, requires_grad=False).float()
             p = np.random.permutation(np.arange(inputs_tcr.shape[0]))
             inputs_tcr_neg = Variable(inputs_tcr[p], requires_grad=False).float()
-            
-            targets_pos = Variable(np.ones(inputs_tcr_pos.shape[0]), requires_grad=False).float()
-            targets_neg = Variable(np.ones(inputs_tcr_neg.shape[0]), requires_grad=False).float()
+            targets_pos = np.zeros((inputs_tcr_pos.shape[0],2))
+            targets_neg = np.zeros((inputs_tcr_neg.shape[0],2))
+            targets_pos[:,1]+=1
+            targets_neg[:,0]+=1
+            targets_pos = torch.FloatTensor(targets_pos)
+            targets_pos = Variable(targets_pos, requires_grad=False).float()
+            targets_neg = torch.FloatTensor(targets_neg)
+            targets_neg = Variable(targets_neg, requires_grad=False).float()
+
 
             if not opt.cpu:
                 inputs_tcr_pos = inputs_tcr_pos.cuda(opt.gpu_selection)
@@ -110,23 +119,28 @@ def main(argv=None):
             #import pdb; pdb.set_trace()
             inputs_tcr_pos = inputs_tcr_pos.squeeze().permute(0, 2, 1)
             inputs_tcr_neg = inputs_tcr_neg.squeeze().permute(0, 2, 1)
-            y_pred1, y_pred2 = my_model(inputs_tcr_pos, inputs_tcr_neg).float()
+            y_pred1, y_pred2 = my_model(inputs_tcr_pos,inputs_tcr_neg)#transform to float?
+            #y_pred1 = y_pred1.float()
+            #y_pred2 = y_pred2.float()
 
             #import pdb; pdb.set_trace()
-            y_pred1 = y_pred1.permute(1,0)
-            y_pred2 = y_pred2.permute(1,0)
+            #y_pred1 = y_pred1.permute(1,0)
+            #y_pred2 = y_pred2.permute(1,0)
 
             loss = criterion(y_pred1, targets_pos)
+            losstemp = loss.cpu().data.reshape(1,).numpy()[0]
+            loss_epoch.append(losstemp)
 
- 
             # Zero gradients, perform a backward pass, and update the weights.
             optimizer.zero_grad()
-            loss.backward()
+            loss.backward(retain_graph=True)
             optimizer.step()
 
             loss = criterion(y_pred2, targets_neg)
+            losstemp = loss.cpu().data.reshape(1,).numpy()[0]
+            loss_epoch.append(losstemp)
 
- 
+
             # Zero gradients, perform a backward pass, and update the weights.
             optimizer.zero_grad()
             loss.backward()
@@ -136,13 +150,16 @@ def main(argv=None):
             if no_b % 5 == 0:
                 print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
 
-                
 
             kmerembs = my_model.fv
             np.save(f'{exp_dir}/kmer_embs/kmer_embs_batch_{no_b}',kmerembs.cpu().data.numpy())
 
+
+
         #print ("Saving the model...")
+        loss_monitoring.append(np.mean(loss_epoch))
         monitoring.save_checkpoint(my_model, optimizer, t, opt, exp_dir)
+        np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring))
 
 
 
