@@ -81,67 +81,12 @@ class DeepInfoMax(nn.Module):
 
         return mlp_output_1, mlp_output_2
 
-class Benchmark(nn.Module):
 
-    def __init__(self, nb_samples=1, layers_size = [25,10], out_channels = 5, emb_size = 10,data_dir ='.'):
-        super(DeepInfoMax, self).__init__()
-
-        self.sample = nb_samples
-        self.out_channels = out_channels
-        self.emb_size = emb_size
-        #self.conv1 = nn.Conv1d(in_channels = 20,out_channels = 10,kernel_size = 15,stride = 1)
-        #self.conv2 = nn.Conv1d(in_channels = 10,out_channels = self.out_channels, kernel_size=12,stride = 1)
-
-        self.conv1 = nn.Conv1d(in_channels = 20,out_channels = 10,kernel_size = 5,stride = 1)
-        self.conv2 = nn.Conv1d(in_channels = 10,out_channels = self.out_channels, kernel_size=14,stride = 1)
-        layers = []
-        dim = [(10*(27-5+1))+self.out_channels*self.emb_size] + layers_size # Adding the emb size*out_channels
-        #dim = [(10*(27-15+1))+self.emb_size] + layers_size # Adding the emb size*out_channels
-
-        for size_in, size_out in zip(dim[:-1], dim[1:]):
-            layer = nn.Linear(size_in, size_out)
-            layers.append(layer)
-
-        self.mlp_layers = nn.ModuleList(layers)
-
-        # Last layer
-        self.last_layer = nn.Linear(dim[-1], 2)
-        self.softmax = nn.Softmax(dim=14)
-
-
- 
-    def get_feature_vector(self, x1):
-
-        fv = self.conv1(x1)
-        fm = self.conv2(fv)
-        #import pdb; pdb.set_trace()
-
-        fm = fm.reshape((fm.shape[0], fm.shape[1]*fm.shape[2]))
-        return fm
-
-    def forward(self,  x1):
-
-        
-        mlp_input = self.get_feature_vector(x1)
-        
-        
-        for layer in self.mlp_layers:
-            mlp_input = layer(mlp_input)
-            mlp_input = F.tanh(mlp_input)
-        mlp_output = self.last_layer(mlp_input)
-        mlp_output = self.softmax(mlp_output)
-
-
-
-        return mlp_output
 
 def get_model(opt, inputs_size, model_state=None):
 
     if opt.model == 'CNN':
         model_class = DeepInfoMax
-        model = model_class(layers_size=opt.layers_size, out_channels=opt.out_channels, emb_size=opt.emb_size, data_dir = opt.data_dir)
-    elif opt.model == 'benchmark':
-        model_class = Benchmark
         model = model_class(layers_size=opt.layers_size, out_channels=opt.out_channels, emb_size=opt.emb_size, data_dir = opt.data_dir)
     else:
         raise NotImplementedError()

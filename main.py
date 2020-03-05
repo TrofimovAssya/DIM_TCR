@@ -24,7 +24,7 @@ def build_parser():
     ### Dataset specific options
     parser.add_argument('--data-dir', default='./data/', help='The folder contaning the dataset.')
     parser.add_argument('--data-file', default='.', help='The data file with the dataset.')
-    parser.add_argument('--dataset', choices=['tcr','tcr_benchmark'], default='tcr', help='Which dataset to use.')
+    parser.add_argument('--dataset', choices=['tcr'], default='tcr', help='Which dataset to use.')
 
     # Model specific options
     parser.add_argument('--layers-size', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
@@ -32,7 +32,7 @@ def build_parser():
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')
     parser.add_argument('--loss', choices=['NLL'], default = 'NLL', help='The cost function to use')
     parser.add_argument('--weight-decay', default=1e-5, type=float, help='The size of the embeddings.')
-    parser.add_argument('--model', choices=['CNN', 'benchmark'], default='CNN', help='Which sequence model to use.')
+    parser.add_argument('--model', choices=['CNN'], default='CNN', help='Which sequence model to use.')
     parser.add_argument('--cpu', action='store_true', help='If we want to run on cpu.')
     parser.add_argument('--name', type=str, default=None, help="If we want to add a random str to the folder.")
     parser.add_argument('--gpu-selection', type=int, default=0, help="selectgpu")
@@ -72,9 +72,10 @@ def main(argv=None):
 
     # Creating a model
     print ("Getting the model...")
-    my_model, optimizer, epoch, opt = monitoring.load_checkpoint(exp_dir, opt, dataset.dataset.input_size(), )
+    my_model, optimizer, epoch, opt = monitoring.load_checkpoint(exp_dir, opt )
 
     criterion = torch.nn.NLLLoss()
+    criterion = torch.nn.BCELoss()
 
 
     os.mkdir(f'{exp_dir}/kmer_embs/') #storing the representation
@@ -87,130 +88,79 @@ def main(argv=None):
     print ("Start training.")
     loss_monitoring = []
     #monitoring and predictions
-    if opt.model == 'CNN':
-        for t in range(epoch, opt.epoch):
+    for t in range(epoch, opt.epoch):
 
-            start_timer = time.time()
-            loss_epoch = []
-            for no_b, mini in enumerate(dataset):
+        start_timer = time.time()
+        loss_epoch = []
+        for no_b, mini in enumerate(dataset):
 
-                inputs_tcr = mini[0]
+            inputs_tcr = mini[0]
 
-                inputs_tcr_pos = Variable(inputs_tcr, requires_grad=False).float()
-                p = np.random.permutation(np.arange(inputs_tcr.shape[0]))
-                inputs_tcr_neg = Variable(inputs_tcr[p], requires_grad=False).float()
-                
-                targets_pos = Variable(np.ones(inputs_tcr_pos.shape[0]), requires_grad=False).float()
-                targets_neg = Variable(np.ones(inputs_tcr_neg.shape[0]), requires_grad=False).float()
-
-                if not opt.cpu:
-                    inputs_tcr_pos = inputs_tcr_pos.cuda(opt.gpu_selection)
-                    inputs_tcr_neg = inputs_tcr_neg.cuda(opt.gpu_selection)
-                    targets_pos = targets_pos.cuda(opt.gpu_selection)
-                    targets_neg = targets_neg.cuda(opt.gpu_selection)
-
-                # Forward pass: Compute predicted y by passing x to the model
-                #import pdb; pdb.set_trace()
-                inputs_tcr_pos = inputs_tcr_pos.squeeze().permute(0, 2, 1)
-                inputs_tcr_neg = inputs_tcr_neg.squeeze().permute(0, 2, 1)
-                y_pred1, y_pred2 = my_model(inputs_tcr_pos, inputs_tcr_neg).float()
-
-                #import pdb; pdb.set_trace()
-                y_pred1 = y_pred1.permute(1,0)
-                y_pred2 = y_pred2.permute(1,0)
-
-                loss = criterion(y_pred1, targets_pos)
-                losstemp = loss.cpu().data.reshape(1,).numpy()[0]
-                loss_epoch.append(losstemp)
-
-     
-                # Zero gradients, perform a backward pass, and update the weights.
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                loss = criterion(y_pred2, targets_neg)
-
-     
-                # Zero gradients, perform a backward pass, and update the weights.
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+            inputs_tcr_pos = Variable(inputs_tcr, requires_grad=False).float()
+            p = np.random.permutation(np.arange(inputs_tcr.shape[0]))
+            inputs_tcr_neg = Variable(inputs_tcr[p], requires_grad=False).float()
+            targets_pos = np.zeros((inputs_tcr_pos.shape[0],2))
+            targets_neg = np.zeros((inputs_tcr_neg.shape[0],2))
+            targets_pos[:,1]+=1
+            targets_neg[:,0]+=1
+            targets_pos = torch.FloatTensor(targets_pos)
+            targets_pos = Variable(targets_pos, requires_grad=False).float()
+            targets_neg = torch.FloatTensor(targets_neg)
+            targets_neg = Variable(targets_neg, requires_grad=False).float()
 
 
-                if no_b % 5 == 0:
-                    print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
+            if not opt.cpu:
+                inputs_tcr_pos = inputs_tcr_pos.cuda(opt.gpu_selection)
+                inputs_tcr_neg = inputs_tcr_neg.cuda(opt.gpu_selection)
+                targets_pos = targets_pos.cuda(opt.gpu_selection)
+                targets_neg = targets_neg.cuda(opt.gpu_selection)
 
-                    
+            # Forward pass: Compute predicted y by passing x to the model
+            #import pdb; pdb.set_trace()
+            inputs_tcr_pos = inputs_tcr_pos.squeeze().permute(0, 2, 1)
+            inputs_tcr_neg = inputs_tcr_neg.squeeze().permute(0, 2, 1)
+            y_pred1, y_pred2 = my_model(inputs_tcr_pos,inputs_tcr_neg)#transform to float?
+            #y_pred1 = y_pred1.float()
+            #y_pred2 = y_pred2.float()
 
-                kmerembs = my_model.fv
-                np.save(f'{exp_dir}/kmer_embs/kmer_embs_batch_{no_b}',kmerembs.cpu().data.numpy())
+            #import pdb; pdb.set_trace()
+            #y_pred1 = y_pred1.permute(1,0)
+            #y_pred2 = y_pred2.permute(1,0)
 
-            #print ("Saving the model...")
-            loss_monitoring.append(np.mean(loss_epoch))
-            monitoring.save_checkpoint(my_model, optimizer, t, opt, exp_dir)
-            np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring))
+            loss = criterion(y_pred1, targets_pos)
+            losstemp = loss.cpu().data.reshape(1,).numpy()[0]
+            loss_epoch.append(losstemp)
 
-    elif opt.model == 'benchmark':
-        for t in range(epoch, opt.epoch):
+            # Zero gradients, perform a backward pass, and update the weights.
+            optimizer.zero_grad()
+            loss.backward(retain_graph=True)
+            optimizer.step()
 
-            start_timer = time.time()
-            loss_epoch_train = []
-            loss_epoch_valid = []
-            for no_b, mini in enumerate(dataset):
-
-                inputs_tcr, targets_tcr = mini[0], mini[1]
-
-                inputs_tcr = Variable(inputs_tcr, requires_grad=False).float()
-                
-                
-                targets_tcr = Variable(targets_tcr, requires_grad=False).float()
-                
-
-
-                if not opt.cpu:
-                    inputs_tcr = inputs_tcr.cuda(opt.gpu_selection)
-                    targets_tcr = targets_tcr.cuda(opt.gpu_selection)
-                    
-                # Forward pass: Compute predicted y by passing x to the model
-                #import pdb; pdb.set_trace()
-                inputs_tcr = inputs_tcr.squeeze().permute(0, 2, 1)
-
-                y_pred= my_model(inputs_tcr).float()
-
-                #import pdb; pdb.set_trace()
-                y_pred = y_pred.permute(1,0)
-
-                loss = criterion(y_pred, targets_pos)
-                losstemp = loss.cpu().data.reshape(1,).numpy()[0]
-                
+            loss = criterion(y_pred2, targets_neg)
+            losstemp = loss.cpu().data.reshape(1,).numpy()[0]
+            loss_epoch.append(losstemp)
 
 
-                if not no_b < 99:
-                    # Zero gradients, perform a backward pass, and update the weights.
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-                    loss_epoch_train.append(losstemp)
-                    
+            # Zero gradients, perform a backward pass, and update the weights.
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-                    if no_b % 5 == 0:
-                        print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
 
-                else:
-                    loss_epoch_valid.append(losstemp)
+            if no_b % 5 == 0:
+                print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
 
-                
-                
 
-            #print ("Saving the model...")
+            kmerembs = my_model.fv
+            np.save(f'{exp_dir}/kmer_embs/kmer_embs_batch_{no_b}',kmerembs.cpu().data.numpy())
 
-            loss_monitoring.append(np.mean(loss_epoch_train))
-            loss_monitoring_v.append(np.mean(loss_epoch_valid))
-            monitoring.save_checkpoint(my_model, optimizer, t, opt, exp_dir)
-            np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring))
-            np.save(f'{exp_dir}/valid_loss',np.array(loss_monitoring_v))
-            
+
+
+        #print ("Saving the model...")
+        loss_monitoring.append(np.mean(loss_epoch))
+        monitoring.save_checkpoint(my_model, optimizer, t, opt, exp_dir)
+        np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring))
+
 
 
 if __name__ == '__main__':

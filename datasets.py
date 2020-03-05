@@ -9,7 +9,7 @@ import pandas as pd
 class TCRDataset(Dataset):
     """TCR CDR3 dataset"""
 
-    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', nb_kmer = 1000):
+    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy'):
         self.root_dir = root_dir
         data_path = os.path.join(root_dir, data_file)
         self.data = pd.read_csv(data_path, header=None)
@@ -19,34 +19,8 @@ class TCRDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        tcr = np.load(f'{self.root_dir}/{idx}_tcr.npy')
-        
+        tcr = np.load(f'{self.root_dir}/{idx}_tcr_gd.npy')
         return tcr
-
-    def input_size(self):
-        return self.nb_kmer
-
-    def extra_info(self):
-        info = OrderedDict()
-        return info
-
-class TCRBenchmark(Dataset):
-    """TCR CDR3 dataset"""
-
-    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', nb_kmer = 1000):
-        self.root_dir = root_dir
-        data_path = os.path.join(root_dir, data_file)
-        self.data = pd.read_csv(data_path, header=None)
-        self.data = list(self.data[0])
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        tcr = np.load(f'{self.root_dir}/{idx}_gd.npy')
-        target = np.load(f'{self.root_dir}/{idx}_targets.npy')
-        
-        return tcr, target
 
     def input_size(self):
         return self.nb_kmer
@@ -60,9 +34,7 @@ class TCRBenchmark(Dataset):
 def get_dataset(opt, exp_dir):
 
     if opt.dataset == 'tcr':
-        dataset = TCRDataset(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, nb_kmer = opt.nb_kmer)
-    elif opt.dataset == 'tcr_benchmark':
-        dataset = TCRBenchmark(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, nb_kmer = opt.nb_kmer)
+        dataset = TCRDataset(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file)
     else:
         raise NotImplementedError()
 
