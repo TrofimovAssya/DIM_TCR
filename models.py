@@ -7,7 +7,7 @@ from itertools import chain
 
 class DeepInfoMax(nn.Module):
 
-    def __init__(self, nb_samples=1, conv_layers_sizes = [20,10,15,10,5,12],mlp_layers_size = [25,10], emb_size = 10,data_dir ='.'):
+    def __init__(self, nb_samples=1, conv_layers_sizes = [20,10,5,10,5,14],mlp_layers_size = [25,10], emb_size = 10,data_dir ='.'):
         super(DeepInfoMax, self).__init__()
 
         self.sample = nb_samples

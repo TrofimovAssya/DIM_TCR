@@ -9,17 +9,67 @@ import pandas as pd
 class TCRDataset(Dataset):
     """TCR CDR3 dataset"""
 
-    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy'):
+    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
         self.root_dir = root_dir
         data_path = os.path.join(root_dir, data_file)
         self.data = pd.read_csv(data_path, header=None)
         self.data = list(self.data[0])
+        self.suffix = data_suffix
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        tcr = np.load(f'{self.root_dir}/{idx}_tcr_gd.npy')
+        tcr = np.load(f'{self.root_dir}/{idx}_tcr{self.suffix}.npy')
+        return tcr
+
+    def input_size(self):
+        return self.nb_kmer
+
+    def extra_info(self):
+        info = OrderedDict()
+        return info
+
+class TCRclassify(Dataset):
+    """TCR CDR3 dataset"""
+
+    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
+        self.root_dir = root_dir
+        data_path = os.path.join(root_dir, data_file)
+        self.data = pd.read_csv(data_path, header=None)
+        self.data = list(self.data[0])
+        self.suffix = data_suffix
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        tcr = np.load(f'{self.root_dir}/{idx}_tcr{self.suffix}.npy')
+        target = np.load(f'{self.root_dir}/{idx}_targets.npy')
+        return tcr
+
+    def input_size(self):
+        return self.nb_kmer
+
+    def extra_info(self):
+        info = OrderedDict()
+        return info
+
+class TCRautoencoder(Dataset):
+    """TCR CDR3 dataset"""
+
+    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
+        self.root_dir = root_dir
+        data_path = os.path.join(root_dir, data_file)
+        self.data = pd.read_csv(data_path, header=None)
+        self.data = list(self.data[0])
+        self.suffix = data_suffix
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        tcr = np.load(f'{self.root_dir}/{idx}_tcr{self.suffix}.npy')
         return tcr
 
     def input_size(self):
@@ -30,11 +80,14 @@ class TCRDataset(Dataset):
         return info
 
 
-
 def get_dataset(opt, exp_dir):
 
     if opt.dataset == 'tcr':
-        dataset = TCRDataset(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file)
+        dataset = TCRDataset(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, data_suffix = opt.suffix)
+    elif opt.dataset == 'classify':
+        dataset = TCRclassify(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, data_suffix = opt.suffix)
+    elif opt.dataset == 'ae':
+        dataset = TCRautoencoder(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, data_suffix = opt.suffix)
     else:
         raise NotImplementedError()
 

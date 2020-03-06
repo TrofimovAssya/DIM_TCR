@@ -24,13 +24,15 @@ def build_parser():
     ### Dataset specific options
     parser.add_argument('--data-dir', default='./data/', help='The folder contaning the dataset.')
     parser.add_argument('--data-file', default='.', help='The data file with the dataset.')
-    parser.add_argument('--dataset', choices=['classify','ae'], default='classify', help='Which dataset to use.')
+    parser.add_argument('--dataset', choices=['classify', 'ae'], default='classify', help='Which dataset to use.')
+    parser.add_argument('--suffix', type=str, default='_gd', help='Which dataset suffix to use')
 
     # Model specific options
+    parser.add_argument('--cnn-layers', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--layers-size', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--emb-size', default=10, type=int, help='The size of the feature vector')
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')
-    parser.add_argument('--loss', choices=['NLL','MSE'], default = 'NLL', help='The cost function to use')
+    parser.add_argument('--loss', choices=['NLL'], default = 'NLL', help='The cost function to use')
     parser.add_argument('--weight-decay', default=1e-5, type=float, help='The size of the embeddings.')
     parser.add_argument('--model', choices=['classifier', 'ae'], default='classifier', help='Which sequence model to use.')
     parser.add_argument('--cpu', action='store_true', help='If we want to run on cpu.')
@@ -40,7 +42,7 @@ def build_parser():
 
     # Monitoring options
     parser.add_argument('--load-folder', help='The folder where to load and restart the training.')
-    parser.add_argument('--save-dir', default='./benchmark123/', help='The folder where everything will be saved.')
+    parser.add_argument('--save-dir', default='./testing123/', help='The folder where everything will be saved.')
 
     return parser
 
