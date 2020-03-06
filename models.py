@@ -174,6 +174,85 @@ class CNNClassifier(nn.Module):
 
         return mlp_output
 
+class CNNAutoEncoder(nn.Module):
+
+    def __init__(self, nb_samples=1, conv_layers_sizes = [20,10,15,10,5,12],mlp_layers_size = [25,10], emb_size = 10, class_number = 14, data_dir ='.'):
+        super(CNNAutoEncoder, self).__init__()
+
+        self.sample = nb_samples
+        self.emb_size = emb_size
+        self.class_number
+
+        ## adding on the conv layers
+        if len(conv_layers_sizes)>=3:
+            self.conv1 = nn.Conv1d(in_channels = conv_layers_sizes[0],out_channels = conv_layers_sizes[1],kernel_size = conv_layers_sizes[2],stride = 1)
+            self.deconv1 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[1],out_channels = conv_layers_sizes[0],kernel_size = conv_layers_sizes[2],stride = 1)
+            self.cnn_stack = 1
+
+        if len(conv_layers_sizes)>=6:
+            self.conv2 = nn.Conv1d(in_channels = conv_layers_sizes[3],out_channels = conv_layers_sizes[4], kernel_size=conv_layers_sizes[5],stride = 1)
+            self.deconv2 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[4],out_channels = conv_layers_sizes[3],kernel_size = conv_layers_sizes[5],stride = 1)
+            self.cnn_stack = 2
+        if len(conv_layers_sizes)>=9:
+            self.conv3 = nn.Conv1d(in_channels = conv_layers_sizes[6],out_channels = conv_layers_sizes[7], kernel_size=conv_layers_sizes[8],stride = 1)
+            self.deconv3 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[7],out_channels = conv_layers_sizes[6],kernel_size = conv_layers_sizes[8],stride = 1)
+            self.cnn_stack = 3
+        if len(conv_layers_sizes)>=12:
+            self.conv4 = nn.Conv1d(in_channels = conv_layers_sizes[9],out_channels = conv_layers_sizes[10], kernel_size=conv_layers_sizes[11],stride = 1)
+            self.deconv4 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[10],out_channels = conv_layers_sizes[9],kernel_size = conv_layers_sizes[11],stride = 1)
+            self.cnn_stack = 4
+        if len(conv_layers_sizes)>=15:
+            self.conv5 = nn.Conv1d(in_channels = conv_layers_sizes[12],out_channels = conv_layers_sizes[13], kernel_size=conv_layers_sizes[14],stride = 1)
+            self.deconv5 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[13],out_channels = conv_layers_sizes[12],kernel_size = conv_layers_sizes[14],stride = 1)
+            self.cnn_stack = 5
+
+
+
+    def encode(self, x1):
+
+        fv = self.conv1(x1)
+        if self.cnn_stack>1:
+            fv = self.conv2(fv)
+        if self.cnn_stack >2:
+            fv = self.conv3(fv)
+        if self.cnn_stack >3:
+            fv = self.conv4(fv)
+        if self.cnn_stack >4:
+            fv = self.conv5(fv)
+
+        #import pdb; pdb.set_trace()
+
+        fv = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
+        return fv
+
+    def decode(self, fv):
+
+        fv = self.deconv1(fv)
+
+        if self.cnn_stack >4:
+            fv = self.deconv5(fv)
+        if self.cnn_stack >3:
+            fv = self.deconv4(fv)
+        if self.cnn_stack >2:
+            fv = self.deconv3(fv)
+        if self.cnn_stack >1:
+            fv = self.deconv2(fv)
+
+        fv = self.deconv1(fv)
+        
+        output = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
+        return output
+
+    def forward(self,  x1):
+
+        # Get the feature maps
+
+        fv = self.encode(x1)
+        self.fv = fv
+        output = self.decode(fv)
+
+        return output
+
 def get_model(opt, inputs_size, model_state=None):
 
     if opt.model == 'CNN':
@@ -182,9 +261,9 @@ def get_model(opt, inputs_size, model_state=None):
     elif opt.model == 'classifier':
         model_class = CNNClassifier
         model = model_class(conv_layers_size = opt.cnn_layers, mlp_layers_size=opt.layers_size, out_channels=opt.out_channels, emb_size=opt.emb_size, class_number = opt.nbclasses, data_dir = opt.data_dir)
-    #elif opt.model == 'ae':
-    #    model_class = CNNAutoEncoder
-    #    model = model_class(layers_size=opt.layers_size, out_channels=opt.out_channels, emb_size=opt.emb_size, data_dir = opt.data_dir)
+    elif opt.model == 'ae':
+        model_class = CNNAutoEncoder
+        model = model_class(layers_size=opt.layers_size, out_channels=opt.out_channels, emb_size=opt.emb_size, data_dir = opt.data_dir)
     else:
         raise NotImplementedError()
 
