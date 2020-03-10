@@ -75,6 +75,7 @@ def main(argv=None):
     # Creating a model
     print ("Getting the model...")
     my_model, optimizer, epoch, opt = monitoring.load_checkpoint(exp_dir, opt )
+    print (my_model)
 
     criterion = torch.nn.NLLLoss()
     criterion = torch.nn.BCELoss()

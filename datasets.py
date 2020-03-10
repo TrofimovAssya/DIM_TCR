@@ -36,6 +36,7 @@ class TCRclassify(Dataset):
     def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
         self.root_dir = root_dir
         data_path = os.path.join(root_dir, data_file)
+        import pdb; pdb.set_trace()
         self.data = pd.read_csv(data_path, header=None)
         self.data = list(self.data[0])
         self.suffix = data_suffix
@@ -44,9 +45,11 @@ class TCRclassify(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        tcr = np.load(f'{self.root_dir}/{idx}_tcr{self.suffix}.npy')
-        target = np.load(f'{self.root_dir}/{idx}_targets.npy')
-        return tcr
+        idx = self.data[idx]
+        tcr = np.load(f'{self.root_dir}/benchmark_dataset{idx}{self.suffix}.npy')
+        target = np.load(f'{self.root_dir}/benchmark_dataset{idx}_targets.npy')
+        target = np.argmax(target,axis=1)
+        return tcr, target
 
     def input_size(self):
         return self.nb_kmer

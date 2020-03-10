@@ -35,6 +35,7 @@ def build_parser():
     parser.add_argument('--loss', choices=['NLL'], default = 'NLL', help='The cost function to use')
     parser.add_argument('--weight-decay', default=1e-5, type=float, help='The size of the embeddings.')
     parser.add_argument('--model', choices=['classifier', 'ae'], default='classifier', help='Which sequence model to use.')
+    parser.add_argument('--nbclasses',default=14, type=int, help='Nuumber of classes for the classification model') 
     parser.add_argument('--cpu', action='store_true', help='If we want to run on cpu.')
     parser.add_argument('--name', type=str, default=None, help="If we want to add a random str to the folder.")
     parser.add_argument('--gpu-selection', type=int, default=0, help="selectgpu")
@@ -94,18 +95,22 @@ def main(argv=None):
     # The training.
     print ("Start training.")
     loss_monitoring_train = []
+    acc_monitoring_train = []
     loss_monitoring_valid = []
+    acc_monitoring_valid = []
     #monitoring and predictions
     for t in range(epoch, opt.epoch):
 
         start_timer = time.time()
         loss_epoch_train = []
+        accuracy_epoch_train = []
         loss_epoch_valid = []
+        accuracy_epoch_valid = []
 
         for no_b, mini in enumerate(dataset):
             if opt.model == 'classifier':
                 inputs_tcr, targets = mini[0], mini[1]
-                targets = Variable(targets, requires_grad=False).float()
+                targets =  Variable(targets, requires_grad=False)
 
             elif opt.model == 'ae':
                 inputs_tcr = mini[0]
@@ -126,25 +131,43 @@ def main(argv=None):
             y_pred = my_model(inputs_tcr)
 
             if opt.model=='classifier':
+                targets = targets.squeeze()
+                targets = targets.long()
                 loss = criterion(y_pred, targets)
             elif opt.model == 'ae':
                 loss = criterion(y_pred, inputs_tcr)
 
 
             losstemp = loss.cpu().data.reshape(1,).numpy()[0]
-            if no_b<99:
+            if no_b<85:
+                preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
+                nb_examples = len(preds)
+                nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
+                percent = nb_correct*100/nb_examples
                 loss_epoch_train.append(losstemp)
+                accuracy_epoch_train.append(percent)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
             else:
+                preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
+                nb_examples = len(preds)
+                nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
+                percent = nb_correct*100/nb_examples
                 loss_epoch_valid.append(losstemp)
+                accuracy_epoch_valid.append(percent)
+
+
 
 
             if no_b % 5 == 0:
                 print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
-            if no_b >98 :
-                print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
+            if no_b ==85 :
+                preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
+                nb_examples = len(preds)
+                nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
+                percent = nb_correct*100/nb_examples
+                print (f"Validation set: {nb_correct}/{nb_examples} ---- {percent}%")
 
             #### TO DO: saving of the representation?
             #np.save(f'{exp_dir}/tcr_embs/tcr_embs_batch_{no_b}',tcrembs.cpu().data.numpy())
@@ -154,10 +177,14 @@ def main(argv=None):
         #print ("Saving the model...")
         loss_monitoring_train.append(np.mean(loss_epoch_train))
         loss_monitoring_valid.append(np.mean(loss_epoch_valid))
+        acc_monitoring_train.append(np.mean(accuracy_epoch_train))
+        acc_monitoring_valid.append(np.mean(accuracy_epoch_valid))
         monitoring.save_checkpoint(my_model, optimizer, t, opt, exp_dir)
         np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring_train))
         np.save(f'{exp_dir}/valid_loss',np.array(loss_monitoring_valid))
 
+        np.save(f'{exp_dir}/train_acc',np.array(acc_monitoring_train))
+        np.save(f'{exp_dir}/valid_acc',np.array(acc_monitoring_valid))
 
 
 if __name__ == '__main__':
