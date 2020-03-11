@@ -128,6 +128,7 @@ def main(argv=None):
             #import pdb; pdb.set_trace()
             inputs_tcr = inputs_tcr.squeeze().permute(0, 2, 1)
 
+            optimizer.zero_grad()
             y_pred = my_model(inputs_tcr)
 
             if opt.model=='classifier':
@@ -146,7 +147,6 @@ def main(argv=None):
                 percent = nb_correct*100/nb_examples
                 loss_epoch_train.append(losstemp)
                 accuracy_epoch_train.append(percent)
-                optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
             else:
@@ -184,6 +184,7 @@ def main(argv=None):
         np.save(f'{exp_dir}/valid_loss',np.array(loss_monitoring_valid))
 
         np.save(f'{exp_dir}/train_acc',np.array(acc_monitoring_train))
+        print (f"Training set:----{acc_monitoring_train[-1]}%") 
         np.save(f'{exp_dir}/valid_acc',np.array(acc_monitoring_valid))
 
 

@@ -153,7 +153,7 @@ class CNNClassifier(nn.Module):
 
         # Last layer
         self.last_layer = nn.Linear(dim[-1], self.class_number)
-        self.softmax = nn.Softmax(dim=1)
+        # self.softmax = nn.Softmax(dim=1)
 
 
     def get_feature_vector(self, x1):
@@ -186,7 +186,7 @@ class CNNClassifier(nn.Module):
             mlp_input = layer(mlp_input)
             mlp_input = F.tanh(mlp_input)
         mlp_output = self.last_layer(mlp_input)
-        mlp_output = self.softmax(mlp_output)
+        mlp_output = F.log_softmax(mlp_output)
 
         return mlp_output
 
