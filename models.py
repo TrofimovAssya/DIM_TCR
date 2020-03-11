@@ -192,12 +192,9 @@ class CNNClassifier(nn.Module):
 
 class CNNAutoEncoder(nn.Module):
 
-    def __init__(self, nb_samples=1, conv_layers_sizes = [20,10,15,10,5,12],mlp_layers_size = [25,10], emb_size = 10, class_number = 14, data_dir ='.'):
+    def __init__(self, conv_layers_sizes = [20,10,15,10,5,12], emb_size = 10, data_dir ='.'):
         super(CNNAutoEncoder, self).__init__()
 
-        self.sample = nb_samples
-        self.emb_size = emb_size
-        self.class_number
 
         ## adding on the conv layers
         if len(conv_layers_sizes)>=3:
@@ -238,12 +235,10 @@ class CNNAutoEncoder(nn.Module):
 
         #import pdb; pdb.set_trace()
 
-        fv = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
+        #fv = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
         return fv
 
     def decode(self, fv):
-
-        fv = self.deconv1(fv)
 
         if self.cnn_stack >4:
             fv = self.deconv5(fv)
@@ -255,8 +250,8 @@ class CNNAutoEncoder(nn.Module):
             fv = self.deconv2(fv)
 
         fv = self.deconv1(fv)
-        
-        output = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
+        output = fv
+        #output = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
         return output
 
     def forward(self,  x1):
@@ -279,7 +274,7 @@ def get_model(opt, inputs_size, model_state=None):
         model = model_class(conv_layers_sizes = opt.cnn_layers, mlp_layers_size=opt.layers_size, emb_size=opt.emb_size, class_number = opt.nbclasses, data_dir = opt.data_dir)
     elif opt.model == 'ae':
         model_class = CNNAutoEncoder
-        model = model_class(layers_size=opt.layers_size, out_channels=opt.out_channels, emb_size=opt.emb_size, data_dir = opt.data_dir)
+        model = model_class(conv_layers_sizes = opt.cnn_layers, emb_size=opt.emb_size, data_dir = opt.data_dir)
     else:
         raise NotImplementedError()
 

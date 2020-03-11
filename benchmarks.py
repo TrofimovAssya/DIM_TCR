@@ -32,7 +32,7 @@ def build_parser():
     parser.add_argument('--layers-size', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--emb-size', default=10, type=int, help='The size of the feature vector')
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')
-    parser.add_argument('--loss', choices=['NLL'], default = 'NLL', help='The cost function to use')
+    parser.add_argument('--loss', choices=['NLL','MSE'], default = 'NLL', help='The cost function to use')
     parser.add_argument('--weight-decay', default=1e-5, type=float, help='The size of the embeddings.')
     parser.add_argument('--model', choices=['classifier', 'ae'], default='classifier', help='Which sequence model to use.')
     parser.add_argument('--nbclasses',default=14, type=int, help='Nuumber of classes for the classification model') 
@@ -99,6 +99,8 @@ def main(argv=None):
     loss_monitoring_valid = []
     acc_monitoring_valid = []
     #monitoring and predictions
+
+
     for t in range(epoch, opt.epoch):
 
         start_timer = time.time()
@@ -140,52 +142,68 @@ def main(argv=None):
 
 
             losstemp = loss.cpu().data.reshape(1,).numpy()[0]
-            if no_b<85:
-                preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
-                nb_examples = len(preds)
-                nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
-                percent = nb_correct*100/nb_examples
-                loss_epoch_train.append(losstemp)
-                accuracy_epoch_train.append(percent)
-                loss.backward()
-                optimizer.step()
-            else:
-                preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
-                nb_examples = len(preds)
-                nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
-                percent = nb_correct*100/nb_examples
-                loss_epoch_valid.append(losstemp)
-                accuracy_epoch_valid.append(percent)
+            if opt.model == 'classifier':
+                if no_b<85:
+                    preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
+                    nb_examples = len(preds)
+                    nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
+                    percent = nb_correct*100/nb_examples
+                    loss_epoch_train.append(losstemp)
+                    accuracy_epoch_train.append(percent)
+                    loss.backward()
+                    optimizer.step()
+                else:
+                    preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
+                    nb_examples = len(preds)
+                    nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
+                    percent = nb_correct*100/nb_examples
+                    loss_epoch_valid.append(losstemp)
+                    accuracy_epoch_valid.append(percent)
+
+                if no_b % 5 == 0 and no_b<85:
+                    print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
+                if no_b ==85 :
+                    preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
+                    nb_examples = len(preds)
+                    nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
+                    percent = nb_correct*100/nb_examples
+                    print (f"Validation set: {nb_correct}/{nb_examples} ---- {percent}%")
+
+            elif opt.model == 'ae':
+                if no_b<85:
+                    loss_epoch_train.append(losstemp)
+                    loss.backward()
+                    optimizer.step()
+                else:
+                    loss_epoch_valid.append(losstemp)
+                if no_b % 5 == 0 and no_b<85:
+                    print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
+                if no_b ==85 :
+                    print (f"Validation set: {loss_epoch_valid[-1]}")
 
 
 
-
-            if no_b % 5 == 0:
-                print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
-            if no_b ==85 :
-                preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
-                nb_examples = len(preds)
-                nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
-                percent = nb_correct*100/nb_examples
-                print (f"Validation set: {nb_correct}/{nb_examples} ---- {percent}%")
 
             #### TO DO: saving of the representation?
-            #np.save(f'{exp_dir}/tcr_embs/tcr_embs_batch_{no_b}',tcrembs.cpu().data.numpy())
+            if opt.model == 'ae':
+                tcrembs = my_model.fv
+                np.save(f'{exp_dir}/representations/ae_tcr_{no_b}',tcrembs.cpu().data.numpy())
 
 
 
         #print ("Saving the model...")
         loss_monitoring_train.append(np.mean(loss_epoch_train))
         loss_monitoring_valid.append(np.mean(loss_epoch_valid))
-        acc_monitoring_train.append(np.mean(accuracy_epoch_train))
-        acc_monitoring_valid.append(np.mean(accuracy_epoch_valid))
+        if opt.model == 'classifier':
+            acc_monitoring_train.append(np.mean(accuracy_epoch_train))
+            acc_monitoring_valid.append(np.mean(accuracy_epoch_valid))
+            np.save(f'{exp_dir}/train_acc',np.array(acc_monitoring_train))
+            print (f"Training set:----{acc_monitoring_train[-1]}%") 
+            np.save(f'{exp_dir}/valid_acc',np.array(acc_monitoring_valid))
+
         monitoring.save_checkpoint(my_model, optimizer, t, opt, exp_dir)
         np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring_train))
         np.save(f'{exp_dir}/valid_loss',np.array(loss_monitoring_valid))
-
-        np.save(f'{exp_dir}/train_acc',np.array(acc_monitoring_train))
-        print (f"Training set:----{acc_monitoring_train[-1]}%") 
-        np.save(f'{exp_dir}/valid_acc',np.array(acc_monitoring_valid))
 
 
 if __name__ == '__main__':
