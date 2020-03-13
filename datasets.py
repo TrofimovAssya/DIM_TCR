@@ -83,6 +83,33 @@ class TCRautoencoder(Dataset):
         return info
 
 
+class TCRPepcontrastive(Dataset):
+    """TCR -pep contrastive"""
+
+    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
+        self.root_dir = root_dir
+        data_path = os.path.join(root_dir, data_file)
+        self.data = pd.read_csv(data_path, header=None)
+        self.data = list(self.data[0])
+        self.suffix = data_suffix
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        tcr = np.load(f'{self.root_dir}/{idx}_tcr{self.suffix}.npy')
+        pep = np.load(f'{self.root_dir}/{idx}_pep{self.suffix}.npy')
+        target = np.load(f'{self.root_dir}/{idx}_targets.npy')
+        return tcr,pep,target
+
+    def input_size(self):
+        return self.nb_kmer
+
+    def extra_info(self):
+        info = OrderedDict()
+        return info
+
+
 def get_dataset(opt, exp_dir):
 
     if opt.dataset == 'tcr':
@@ -91,6 +118,8 @@ def get_dataset(opt, exp_dir):
         dataset = TCRclassify(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, data_suffix = opt.suffix)
     elif opt.dataset == 'ae':
         dataset = TCRautoencoder(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, data_suffix = opt.suffix)
+    elif opt.dataset == 'contrastive':
+        dataset = TCRPepcontrastive(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, data_suffix = opt.suffix)
     else:
         raise NotImplementedError()
 
