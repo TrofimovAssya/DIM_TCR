@@ -275,6 +275,9 @@ def get_model(opt, inputs_size, model_state=None):
     elif opt.model == 'ae':
         model_class = CNNAutoEncoder
         model = model_class(conv_layers_sizes = opt.cnn_layers, emb_size=opt.emb_size, data_dir = opt.data_dir)
+    elif opt.model == 'full':
+        model_class = Contrastive
+        model = model_class(mlp_layers_sizes = opt.cnn_layers, emb_size=opt.emb_size, data_dir = opt.data_dir)
     else:
         raise NotImplementedError()
 
