@@ -22,6 +22,7 @@ class TCRDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
+        idx = self.data[idx]
         tcr = np.load(f'{self.root_dir}/{idx}{self.data_type}{self.suffix}.npy')
         return tcr
 
@@ -99,6 +100,7 @@ class TCRPepcontrastive(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
+        idx = self.data[idx]
         tcr = np.load(f'{self.root_dir}/batch_{idx}_tcr_gd.npy')
         pep = np.load(f'{self.root_dir}/batch_{idx}_pep_gd.npy')
         target = np.load(f'{self.root_dir}/batch_{idx}_target.npy')

@@ -27,9 +27,12 @@ def build_parser():
     parser.add_argument('--data-file', default='.', help='The data file with the dataset.')
     parser.add_argument('--dataset', choices=['contrastive'], default='contrastive', help='Which dataset to use.')
     parser.add_argument('--suffix', type=str, default='_gd', help='Which dataset suffix to use')
+    parser.add_argument('--seqtup', type=int, default=[27,11], help='Sequence lengths')
 
     # Model specific options
     parser.add_argument('--cnn-layers', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--cnn-layers1', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--cnn-layers2', default=[20,10,5,10,10,3], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--layers-size', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--emb-size', default=10, type=int, help='The size of the feature vector')
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')
@@ -92,13 +95,16 @@ def main(argv=None):
             self.checkpoint1 = model1
             model1_state = self.checkpoint1['state_dict']
             optimizer1_state = self.checkpoint1['optimizer']
+            opt.seqlength = opt.seqtup[0]
+            opt.cnn_layers = opt.cnn_layers1
             self.model1 = models.get_model(opt, model1_state)
 
             self.checkpoint2 = model2
             model2_state = self.checkpoint2['state_dict']
             optimizer2_state = self.checkpoint2['optimizer']
+            opt.seqlength = opt.seqtup[1]
+            opt.cnn_layers = opt.cnn_layers2
             self.model2 = models.get_model(opt, model2_state)
-            import pdb; pdb.set_trace()
 
             self.cos = nn.CosineSimilarity(dim=1, eps=1e-6) 
 
@@ -108,11 +114,10 @@ def main(argv=None):
             # Get the feature maps
 
             fv1 = self.model1.get_feature_vector(x1)
-            import pdb;pdb.set_trace()
             fv2 = self.model2.get_feature_vector(x2)
 
             ### let's try using a cosine similarity as a measure of distance
-            output = cos(fv1, fv2)
+            output = self.cos(fv1, fv2)
             return output
 
     #Making the final model
@@ -124,7 +129,7 @@ def main(argv=None):
     print ("Getting the dataset...")
     dataset = datasets.get_dataset(opt,exp_dir)
 
-    criterion = torch.nn.BCELoss()
+    criterion = torch.nn.MSELoss()
 
 
 
@@ -134,18 +139,20 @@ def main(argv=None):
 
     # The training.
     print ("Start training.")
-    loss_monitoring = []
+    loss_monitoring_train = []
+    loss_monitoring_valid = []
     #monitoring and predictions
     epoch = 0
     for t in range(epoch, opt.epoch):
 
         start_timer = time.time()
-        loss_epoch = []
+        loss_epoch_train = []
+        loss_epoch_valid = []
         for no_b, mini in enumerate(dataset):
 
-            #optimizer.zero_grad()
+            optimizer.zero_grad()
+            #import pdb;pdb.set_trace()
             inputs_tcr, inputs_pep, targets = mini[0], mini[1], mini[2]
-            import pdb; pdb.set_trace()
 
             inputs_tcr = Variable(inputs_tcr, requires_grad=False).float()
             inputs_pep = Variable(inputs_pep, requires_grad=False).float()
@@ -157,34 +164,34 @@ def main(argv=None):
                 targets = targets.cuda(opt.gpu_selection)
             inputs_tcr = inputs_tcr.squeeze().permute(0, 2, 1)
             inputs_pep = inputs_pep.squeeze().permute(0, 2, 1)
+            targets = targets.squeeze()
 
             ### Passing feature vectors to classification
             y_pred = my_model(inputs_tcr,inputs_pep)
-
+            #import pdb; pdb.set_trace()
 
             loss = criterion(y_pred, targets)
             losstemp = loss.cpu().data.reshape(1,).numpy()[0]
-            loss_epoch.append(losstemp)
-
-            # Zero gradients, perform a backward pass, and update the weights.
-            
-            loss.backward()
-            optimizer.step()
-
-            loss = criterion(y_pred2, targets_neg)
-            losstemp = loss.cpu().data.reshape(1,).numpy()[0]
-            loss_epoch.append(losstemp)
+            if len(dataset)-1==no_b:
+                loss_epoch_valid.append(losstemp)
+                print (f"**** Validation loss: {losstemp} ****")
+            else:
+                loss_epoch_train.append(losstemp)
+                loss.backward()
+                optimizer.step()
 
 
-            if no_b % 5 == 0:
+            if no_b % 39 == 0:
                 print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
 
 
 
         #print ("Saving the model...")
-        loss_monitoring.append(np.mean(loss_epoch))
+        loss_monitoring_train.append(np.mean(loss_epoch_train))
+        loss_monitoring_valid.append(np.mean(loss_epoch_valid))
         monitoring.save_checkpoint(my_model, optimizer, t, opt, exp_dir)
-        np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring))
+        np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring_train))
+        np.save(f'{exp_dir}/valid_loss',np.array(loss_monitoring_valid))
 
 
 

@@ -31,7 +31,7 @@ def build_parser():
 
 
     # Model specific options
-    parser.add_argument('--cnn-layers', default=[20,10,5,10,10,3], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--cnn-layers', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--layers-size', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--emb-size', default=10, type=int, help='The size of the feature vector')
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')
