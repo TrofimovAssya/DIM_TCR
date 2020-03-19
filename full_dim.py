@@ -6,6 +6,7 @@ from torch.autograd import Variable
 import os
 import argparse
 import datasets
+from torch import nn
 import models
 import pickle
 import time
@@ -34,7 +35,7 @@ def build_parser():
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')
     parser.add_argument('--loss', choices=['BCE', 'contrastive'], default = 'BCE', help='The cost function to use')
     parser.add_argument('--weight-decay', default=1e-5, type=float, help='The size of the embeddings.')
-    parser.add_argument('--model', choices=['full','contrastive'], default='full', help='Which sequence model to use.')
+    parser.add_argument('--model', choices=['full','contrastive','CNN'],default='CNN', help='Which sequence model to use.')
     parser.add_argument('--cpu', action='store_true', help='If we want to run on cpu.')
     parser.add_argument('--name', type=str, default=None, help="If we want to add a random str to the folder.")
     parser.add_argument('--gpu-selection', type=int, default=0, help="selectgpu")
@@ -70,23 +71,17 @@ def main(argv=None):
     if exp_dir is None: # we create a new folder if we don't load.
         exp_dir = monitoring.create_experiment_folder(opt)
 
-    # creating the dataset
-    print ("Getting the dataset...")
-    dataset = datasets.get_dataset(opt,exp_dir)
-
     #Getting the TCR dim model
     print ("Getting the model #1...")
     filename = os.path.join(opt.load_folder1, 'checkpoint.pth.tar')
     print (f"=> loading model # 1 from checkpoint '{filename}'")
     model1 = torch.load(filename)
-    print (model1)
 
     # Getting the peptide dim model
     print ("Getting the model #2...")
     filename = os.path.join(opt.load_folder2, 'checkpoint.pth.tar')
     print (f"=> loading model # 2 from checkpoint '{filename}'")
     model2 = torch.load(filename)
-    print (model2)
 
 
     class FullDim(nn.Module):
@@ -94,8 +89,17 @@ def main(argv=None):
         def __init__(self, model1, model2, opt):
             super(FullDim, self).__init__()
 
-            self.model1 = model1
-            self.model2 = model2
+            self.checkpoint1 = model1
+            model1_state = self.checkpoint1['state_dict']
+            optimizer1_state = self.checkpoint1['optimizer']
+            self.model1 = models.get_model(opt, model1_state)
+
+            self.checkpoint2 = model2
+            model2_state = self.checkpoint2['state_dict']
+            optimizer2_state = self.checkpoint2['optimizer']
+            self.model2 = models.get_model(opt, model2_state)
+            import pdb; pdb.set_trace()
+
             self.cos = nn.CosineSimilarity(dim=1, eps=1e-6) 
 
 
@@ -103,8 +107,9 @@ def main(argv=None):
 
             # Get the feature maps
 
-            fv1 = self.encode1(x1)
-            fv2 = self.encode2(x2)
+            fv1 = self.model1.get_feature_vector(x1)
+            import pdb;pdb.set_trace()
+            fv2 = self.model2.get_feature_vector(x2)
 
             ### let's try using a cosine similarity as a measure of distance
             output = cos(fv1, fv2)
@@ -112,8 +117,13 @@ def main(argv=None):
 
     #Making the final model
     my_model = FullDim(model1, model2, opt)
+    optimizer = torch.optim.RMSprop(my_model.parameters(), lr=opt.lr,
+                                    weight_decay=opt.weight_decay)
 
-    criterion = torch.nn.NLLLoss()
+    # creating the dataset
+    print ("Getting the dataset...")
+    dataset = datasets.get_dataset(opt,exp_dir)
+
     criterion = torch.nn.BCELoss()
 
 
@@ -126,35 +136,30 @@ def main(argv=None):
     print ("Start training.")
     loss_monitoring = []
     #monitoring and predictions
+    epoch = 0
     for t in range(epoch, opt.epoch):
 
         start_timer = time.time()
         loss_epoch = []
         for no_b, mini in enumerate(dataset):
 
-            optimizer.zero_grad()
+            #optimizer.zero_grad()
             inputs_tcr, inputs_pep, targets = mini[0], mini[1], mini[2]
+            import pdb; pdb.set_trace()
 
             inputs_tcr = Variable(inputs_tcr, requires_grad=False).float()
             inputs_pep = Variable(inputs_pep, requires_grad=False).float()
             targets = Variable(targets, requires_grad=False).float()
-            
 
             if not opt.cpu:
                 inputs_tcr = inputs_tcr.cuda(opt.gpu_selection)
                 inputs_pep = inputs_pep.cuda(opt.gpu_selection)
                 targets = targets.cuda(opt.gpu_selection)
-                
             inputs_tcr = inputs_tcr.squeeze().permute(0, 2, 1)
             inputs_pep = inputs_pep.squeeze().permute(0, 2, 1)
-            
-            ### Getting encoding from both DIM models
-            tcr_fv = model1(inputs_tcr)
-            pep_fv = model2(inputs_pep)
 
             ### Passing feature vectors to classification
-            y_pred = my_model(tcr_fv,pep_fv)
-            
+            y_pred = my_model(inputs_tcr,inputs_pep)
 
 
             loss = criterion(y_pred, targets)

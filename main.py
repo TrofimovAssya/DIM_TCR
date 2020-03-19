@@ -26,9 +26,12 @@ def build_parser():
     parser.add_argument('--data-file', default='.', help='The data file with the dataset.')
     parser.add_argument('--dataset', choices=['tcr'], default='tcr', help='Which dataset to use.')
     parser.add_argument('--suffix', type=str, default='_gd', help='Which dataset suffix to use')
+    parser.add_argument('--datatype', type=str, default='_tcr', help='Which biological sequence to use')
+    parser.add_argument('--seqlength', type=int, default=27, help='The initial length of the biological sequence')
+
 
     # Model specific options
-    parser.add_argument('--cnn-layers', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--cnn-layers', default=[20,10,5,10,10,3], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--layers-size', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--emb-size', default=10, type=int, help='The size of the feature vector')
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')

@@ -9,18 +9,20 @@ import pandas as pd
 class TCRDataset(Dataset):
     """TCR CDR3 dataset"""
 
-    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
+    def __init__(self,root_dir='.',save_dir='.', data_file='data.npy',
+                 data_suffix = '_gd', data_type = '_tcr'):
         self.root_dir = root_dir
         data_path = os.path.join(root_dir, data_file)
         self.data = pd.read_csv(data_path, header=None)
         self.data = list(self.data[0])
         self.suffix = data_suffix
+        self.data_type = data_type
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        tcr = np.load(f'{self.root_dir}/{idx}_tcr{self.suffix}.npy')
+        tcr = np.load(f'{self.root_dir}/{idx}{self.data_type}{self.suffix}.npy')
         return tcr
 
     def input_size(self):
@@ -97,9 +99,9 @@ class TCRPepcontrastive(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        tcr = np.load(f'{self.root_dir}/{idx}_tcr{self.suffix}.npy')
-        pep = np.load(f'{self.root_dir}/{idx}_pep{self.suffix}.npy')
-        target = np.load(f'{self.root_dir}/{idx}_targets.npy')
+        tcr = np.load(f'{self.root_dir}/batch_{idx}_tcr_gd.npy')
+        pep = np.load(f'{self.root_dir}/batch_{idx}_pep_gd.npy')
+        target = np.load(f'{self.root_dir}/batch_{idx}_target.npy')
         return tcr,pep,target
 
     def input_size(self):
@@ -113,7 +115,8 @@ class TCRPepcontrastive(Dataset):
 def get_dataset(opt, exp_dir):
 
     if opt.dataset == 'tcr':
-        dataset = TCRDataset(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, data_suffix = opt.suffix)
+        dataset = TCRDataset(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file,
+                             data_suffix = opt.suffix, data_type = opt.datatype)
     elif opt.dataset == 'classify':
         dataset = TCRclassify(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file, data_suffix = opt.suffix)
     elif opt.dataset == 'ae':

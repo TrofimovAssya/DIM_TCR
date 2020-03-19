@@ -59,6 +59,7 @@ def parse_args(argv):
 def main(argv=None):
 
     opt = parse_args(argv)
+    import pdb; pdb.set_trace()
     # TODO: set the seed
     seed = opt.seed
     torch.cuda.manual_seed(seed)
