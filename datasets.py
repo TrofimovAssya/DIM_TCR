@@ -23,7 +23,8 @@ class TCRDataset(Dataset):
 
     def __getitem__(self, idx):
         idx = self.data[idx]
-        tcr = np.load(f'{self.root_dir}/{idx}{self.data_type}{self.suffix}.npy')
+        #tcr = np.load(f'{self.root_dir}/{idx}{self.data_type}{self.suffix}.npy')
+        tcr = np.load(f'{self.root_dir}/benchmark_dataset{idx}{self.suffix}.npy')
         return tcr
 
     def input_size(self):
@@ -39,7 +40,6 @@ class TCRclassify(Dataset):
     def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
         self.root_dir = root_dir
         data_path = os.path.join(root_dir, data_file)
-        import pdb; pdb.set_trace()
         self.data = pd.read_csv(data_path, header=None)
         self.data = list(self.data[0])
         self.suffix = data_suffix
@@ -75,7 +75,8 @@ class TCRautoencoder(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        tcr = np.load(f'{self.root_dir}/{idx}_tcr{self.suffix}.npy')
+        #tcr = np.load(f'{self.root_dir}/{idx}_tcr{self.suffix}.npy')
+        tcr = np.load(f'{self.root_dir}/benchmark_dataset{idx}{self.suffix}.npy')
         return tcr
 
     def input_size(self):

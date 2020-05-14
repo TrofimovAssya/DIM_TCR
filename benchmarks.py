@@ -26,6 +26,7 @@ def build_parser():
     parser.add_argument('--data-file', default='.', help='The data file with the dataset.')
     parser.add_argument('--dataset', choices=['classify', 'ae'], default='classify', help='Which dataset to use.')
     parser.add_argument('--suffix', type=str, default='_gd', help='Which dataset suffix to use')
+    parser.add_argument('--valid', type=int, default=99, help='Which batch to use as validation')
 
     # Model specific options
     parser.add_argument('--cnn-layers', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
@@ -59,7 +60,6 @@ def parse_args(argv):
 def main(argv=None):
 
     opt = parse_args(argv)
-    import pdb; pdb.set_trace()
     # TODO: set the seed
     seed = opt.seed
     torch.cuda.manual_seed(seed)
@@ -73,7 +73,7 @@ def main(argv=None):
     # creating the dataset
     print ("Getting the dataset...")
     dataset = datasets.get_dataset(opt,exp_dir)
-
+    #import pdb; pdb.set_trace()
     # Creating a model
     print ("Getting the model...")
     my_model, optimizer, epoch, opt = monitoring.load_checkpoint(exp_dir, opt )
@@ -87,7 +87,7 @@ def main(argv=None):
     
 
 
-    os.mkdir(f'{exp_dir}/tcr_embs/') #storing the representation
+    os.mkdir(f'{exp_dir}/representations/') #storing the representation
 
     if not opt.cpu:
         print ("Putting the model on gpu...")
@@ -144,7 +144,7 @@ def main(argv=None):
 
             losstemp = loss.cpu().data.reshape(1,).numpy()[0]
             if opt.model == 'classifier':
-                if no_b<85:
+                if not no_b == opt.valid:
                     preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
                     nb_examples = len(preds)
                     nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
@@ -161,9 +161,9 @@ def main(argv=None):
                     loss_epoch_valid.append(losstemp)
                     accuracy_epoch_valid.append(percent)
 
-                if no_b % 5 == 0 and no_b<85:
+                if no_b % 5 == 0 and not no_b==opt.valid:
                     print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
-                if no_b ==85 :
+                if no_b ==opt.valid :
                     preds = np.argmax(y_pred.cpu().data.numpy(),axis=1)
                     nb_examples = len(preds)
                     nb_correct = np.sum([i==j for i,j in zip(targets.cpu().data.numpy(),preds)])
@@ -171,15 +171,15 @@ def main(argv=None):
                     print (f"Validation set: {nb_correct}/{nb_examples} ---- {percent}%")
 
             elif opt.model == 'ae':
-                if no_b<85:
+                if not no_b==opt.valid:
                     loss_epoch_train.append(losstemp)
                     loss.backward()
                     optimizer.step()
                 else:
                     loss_epoch_valid.append(losstemp)
-                if no_b % 5 == 0 and no_b<85:
+                if no_b % 5 == 0 and not no_b==opt.valid:
                     print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
-                if no_b ==85 :
+                if no_b ==opt.valid :
                     print (f"Validation set: {loss_epoch_valid[-1]}")
 
 

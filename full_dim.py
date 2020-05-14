@@ -6,7 +6,6 @@ from torch.autograd import Variable
 import os
 import argparse
 import datasets
-from torch import nn
 import models
 import pickle
 import time
@@ -25,20 +24,21 @@ def build_parser():
     ### Dataset specific options
     parser.add_argument('--data-dir', default='./data/', help='The folder contaning the dataset.')
     parser.add_argument('--data-file', default='.', help='The data file with the dataset.')
-    parser.add_argument('--dataset', choices=['contrastive'], default='contrastive', help='Which dataset to use.')
+    parser.add_argument('--dataset', choices=['tcr'], default='tcr', help='Which dataset to use.')
     parser.add_argument('--suffix', type=str, default='_gd', help='Which dataset suffix to use')
-    parser.add_argument('--seqtup', type=int, default=[27,11], help='Sequence lengths')
+    parser.add_argument('--datatype', type=str, default='_tcr', help='Which biological sequence to use')
+    parser.add_argument('--seqlength', type=int, default=27, help='The initial length of the biological sequence')
+
 
     # Model specific options
-    parser.add_argument('--cnn-layers', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
-    parser.add_argument('--cnn-layers1', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
-    parser.add_argument('--cnn-layers2', default=[20,10,5,10,10,3], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--1cnn-layers', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--2cnn-layers', default=[20,10,5,10,10,13], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--layers-size', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
     parser.add_argument('--emb-size', default=10, type=int, help='The size of the feature vector')
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')
-    parser.add_argument('--loss', choices=['BCE', 'contrastive'], default = 'BCE', help='The cost function to use')
+    parser.add_argument('--loss', choices=['NLL'], default = 'NLL', help='The cost function to use')
     parser.add_argument('--weight-decay', default=1e-5, type=float, help='The size of the embeddings.')
-    parser.add_argument('--model', choices=['full','contrastive','CNN'],default='CNN', help='Which sequence model to use.')
+    parser.add_argument('--model', choices=['fullDIM'], default='fullDIM', help='Which sequence model to use.')
     parser.add_argument('--cpu', action='store_true', help='If we want to run on cpu.')
     parser.add_argument('--name', type=str, default=None, help="If we want to add a random str to the folder.")
     parser.add_argument('--gpu-selection', type=int, default=0, help="selectgpu")
@@ -46,8 +46,6 @@ def build_parser():
 
     # Monitoring options
     parser.add_argument('--load-folder', help='The folder where to load and restart the training.')
-    parser.add_argument('--load-folder1', help='The folder where to load the TCR dim.')
-    parser.add_argument('--load-folder2', help='The folder where to load the peptide dim')
     parser.add_argument('--save-dir', default='./testing123/', help='The folder where everything will be saved.')
 
     return parser
@@ -64,74 +62,27 @@ def parse_args(argv):
 def main(argv=None):
 
     opt = parse_args(argv)
-    # TODO: set the seed
     seed = opt.seed
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.manual_seed(seed)
 
     exp_dir = opt.load_folder
-    if exp_dir is None: # we create a new folder if we don't load.
+    if exp_dir is None:
         exp_dir = monitoring.create_experiment_folder(opt)
 
-    #Getting the TCR dim model
-    print ("Getting the model #1...")
-    filename = os.path.join(opt.load_folder1, 'checkpoint.pth.tar')
-    print (f"=> loading model # 1 from checkpoint '{filename}'")
-    model1 = torch.load(filename)
-
-    # Getting the peptide dim model
-    print ("Getting the model #2...")
-    filename = os.path.join(opt.load_folder2, 'checkpoint.pth.tar')
-    print (f"=> loading model # 2 from checkpoint '{filename}'")
-    model2 = torch.load(filename)
-
-
-    class FullDim(nn.Module):
-
-        def __init__(self, model1, model2, opt):
-            super(FullDim, self).__init__()
-
-            self.checkpoint1 = model1
-            model1_state = self.checkpoint1['state_dict']
-            optimizer1_state = self.checkpoint1['optimizer']
-            opt.seqlength = opt.seqtup[0]
-            opt.cnn_layers = opt.cnn_layers1
-            self.model1 = models.get_model(opt, model1_state)
-
-            self.checkpoint2 = model2
-            model2_state = self.checkpoint2['state_dict']
-            optimizer2_state = self.checkpoint2['optimizer']
-            opt.seqlength = opt.seqtup[1]
-            opt.cnn_layers = opt.cnn_layers2
-            self.model2 = models.get_model(opt, model2_state)
-
-            self.cos = nn.CosineSimilarity(dim=1, eps=1e-6) 
-
-
-        def forward(self,  x1, x2):
-
-            # Get the feature maps
-
-            fv1 = self.model1.get_feature_vector(x1)
-            fv2 = self.model2.get_feature_vector(x2)
-
-            ### let's try using a cosine similarity as a measure of distance
-            output = self.cos(fv1, fv2)
-            return output
-
-    #Making the final model
-    my_model = FullDim(model1, model2, opt)
-    optimizer = torch.optim.RMSprop(my_model.parameters(), lr=opt.lr,
-                                    weight_decay=opt.weight_decay)
-
-    # creating the dataset
     print ("Getting the dataset...")
     dataset = datasets.get_dataset(opt,exp_dir)
 
-    criterion = torch.nn.MSELoss()
+    print ("Getting the model...")
+    my_model, optimizer, epoch, opt = monitoring.load_checkpoint(exp_dir, opt )
+    print (my_model)
+
+    criterion = torch.nn.NLLLoss()
+    criterion = torch.nn.BCELoss()
 
 
+    os.mkdir(f'{exp_dir}/kmer_embs/') #storing the representation
 
     if not opt.cpu:
         print ("Putting the model on gpu...")
@@ -139,59 +90,139 @@ def main(argv=None):
 
     # The training.
     print ("Start training.")
-    loss_monitoring_train = []
-    loss_monitoring_valid = []
+    loss_monitoring = []
     #monitoring and predictions
-    epoch = 0
     for t in range(epoch, opt.epoch):
 
         start_timer = time.time()
-        loss_epoch_train = []
-        loss_epoch_valid = []
+        loss_epoch = []
         for no_b, mini in enumerate(dataset):
+            ### TODO: make an optional immunogen prediction so that it's
+            ### possible to train without the immunogen for some examples
 
-            optimizer.zero_grad()
-            #import pdb;pdb.set_trace()
-            inputs_tcr, inputs_pep, targets = mini[0], mini[1], mini[2]
+            inputs_tcr, inputs_pep, immunogen = mini[0], mini[1], mini[2]
 
-            inputs_tcr = Variable(inputs_tcr, requires_grad=False).float()
-            inputs_pep = Variable(inputs_pep, requires_grad=False).float()
-            targets = Variable(targets, requires_grad=False).float()
+            ### creating the positive and negative sets for the DIM-tcr part
+
+            inputs_tcr_pos = Variable(inputs_tcr, requires_grad=False).float()
+            p = np.random.permutation(np.arange(inputs_tcr.shape[0]))
+            inputs_tcr_neg = Variable(inputs_tcr[p], requires_grad=False).float()
+            targets_pos_tcr = np.zeros((inputs_tcr_pos.shape[0],2))
+            targets_neg_tcr = np.zeros((inputs_tcr_neg.shape[0],2))
+            targets_pos_tcr[:,1]+=1
+            targets_neg_tcr[:,0]+=1
+            targets_pos_tcr = torch.FloatTensor(targets_pos_tcr)
+            targets_pos_tcr = Variable(targets_pos_tcr, requires_grad=False).float()
+            targets_neg_tcr = torch.FloatTensor(targets_neg_tcr)
+            targets_neg_tcr = Variable(targets_neg_tcr, requires_grad=False).float()
+
+            ### creating the positive and negative sets for the DIM-pep part
+            inputs_pep_pos = Variable(inputs_pep, requires_grad=False).float()
+            p = np.random.permutation(np.arange(inputs_pep.shape[0]))
+            inputs_pep_neg = Variable(inputs_pep[p], requires_grad=False).float()
+            targets_pos_pep = np.zeros((inputs_pep_pos.shape[0],2))
+            targets_neg_pep = np.zeros((inputs_pep_neg.shape[0],2))
+            targets_pos_pep[:,1]+=1
+            targets_neg_pep[:,0]+=1
+            targets_pos_pep = torch.FloatTensor(targets_pos_pep)
+            targets_pos_pep = Variable(targets_pos_pep, requires_grad=False).float()
+            targets_neg_pep = torch.FloatTensor(targets_neg_pep)
+            targets_neg_pep = Variable(targets_neg_pep, requires_grad=False).float()
+
+            ### creating the immunogenicity target
+            immunogen = Variable(immunogen, requires_grad=False).float()
+
 
             if not opt.cpu:
-                inputs_tcr = inputs_tcr.cuda(opt.gpu_selection)
-                inputs_pep = inputs_pep.cuda(opt.gpu_selection)
-                targets = targets.cuda(opt.gpu_selection)
-            inputs_tcr = inputs_tcr.squeeze().permute(0, 2, 1)
-            inputs_pep = inputs_pep.squeeze().permute(0, 2, 1)
-            targets = targets.squeeze()
+                inputs_tcr_pos = inputs_tcr_pos.cuda(opt.gpu_selection)
+                inputs_tcr_neg = inputs_tcr_neg.cuda(opt.gpu_selection)
+                targets_pos_tcr = targets_pos_tcr.cuda(opt.gpu_selection)
+                targets_neg_tcr = targets_neg_tcr.cuda(opt.gpu_selection)
 
-            ### Passing feature vectors to classification
-            y_pred = my_model(inputs_tcr,inputs_pep)
+                inputs_pep_pos = inputs_pep_pos.cuda(opt.gpu_selection)
+                inputs_pep_neg = inputs_pep_neg.cuda(opt.gpu_selection)
+                targets_pos_pep = targets_pos_pep.cuda(opt.gpu_selection)
+                targets_neg_pep = targets_neg_pep.cuda(opt.gpu_selection)
+
+                immunogen = immunogen.cuda(opt.gpu_selection)
+
+
+            # Forward pass: Compute predicted y by passing x to the model
             #import pdb; pdb.set_trace()
+            inputs_tcr_pos = inputs_tcr_pos.squeeze().permute(0, 2, 1)
+            inputs_tcr_neg = inputs_tcr_neg.squeeze().permute(0, 2, 1)
+            inputs_pep_pos = inputs_pep_pos.squeeze().permute(0, 2, 1)
+            inputs_pep_neg = inputs_pep_neg.squeeze().permute(0, 2, 1)
+            y_pred11, y_pred12, y_pred21, y_pred22, immu_pred = my_model(inputs_tcr_pos,inputs_tcr_neg, inputs_pep_pos,inputs_pep_neg)#transform to float?
+            #y_pred1 = y_pred1.float()
+            #y_pred2 = y_pred2.float()
 
-            loss = criterion(y_pred, targets)
+            #import pdb; pdb.set_trace()
+            #y_pred1 = y_pred1.permute(1,0)
+            #y_pred2 = y_pred2.permute(1,0)
+
+            loss = criterion(y_pred11, targets_pos_tcr)
             losstemp = loss.cpu().data.reshape(1,).numpy()[0]
-            if len(dataset)-1==no_b:
-                loss_epoch_valid.append(losstemp)
-                print (f"**** Validation loss: {losstemp} ****")
-            else:
-                loss_epoch_train.append(losstemp)
-                loss.backward()
-                optimizer.step()
+            loss_epoch.append(losstemp)
+
+            optimizer.zero_grad()
+            loss.backward(retain_graph=True)
+            optimizer.step()
+
+            loss = criterion(y_pred12, targets_neg_tcr)
+            losstemp = loss.cpu().data.reshape(1,).numpy()[0]
+            loss_epoch.append(losstemp)
 
 
-            if no_b % 39 == 0:
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            loss = criterion(y_pred21, targets_pos_pep)
+            losstemp = loss.cpu().data.reshape(1,).numpy()[0]
+            loss_epoch.append(losstemp)
+
+            optimizer.zero_grad()
+            loss.backward(retain_graph=True)
+            optimizer.step()
+
+            loss = criterion(y_pred22, targets_neg_pep)
+            losstemp = loss.cpu().data.reshape(1,).numpy()[0]
+            loss_epoch.append(losstemp)
+
+
+            # Zero gradients, perform a backward pass, and update the weights.
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            loss = criterion2(immu_pred, immunogen)
+            losstemp = loss.cpu().data.reshape(1,).numpy()[0]
+            loss_epoch.append(losstemp)
+
+
+            # Zero gradients, perform a backward pass, and update the weights.
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+
+
+            if no_b % 5 == 0:
                 print (f"Doing epoch {t},examples{no_b}/{len(dataset)}.Loss:{loss.data.cpu().numpy().reshape(1,)[0]}")
+
+
+            kmerembs = my_model.fv_tcr
+            np.save(f'{exp_dir}/tcr_embs/tcr_embs_batch_{no_b}',kmerembs.cpu().data.numpy())
+            kmerembs = my_model.fv_pep
+            np.save(f'{exp_dir}/pep_embs/pep_embs_batch_{no_b}',kmerembs.cpu().data.numpy())
 
 
 
         #print ("Saving the model...")
-        loss_monitoring_train.append(np.mean(loss_epoch_train))
-        loss_monitoring_valid.append(np.mean(loss_epoch_valid))
+        loss_monitoring.append(np.mean(loss_epoch))
         monitoring.save_checkpoint(my_model, optimizer, t, opt, exp_dir)
-        np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring_train))
-        np.save(f'{exp_dir}/valid_loss',np.array(loss_monitoring_valid))
+        np.save(f'{exp_dir}/train_loss',np.array(loss_monitoring))
 
 
 
