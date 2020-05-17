@@ -29,11 +29,14 @@ def build_parser():
     parser.add_argument('--datatype', type=str, default='_tcr', help='Which biological sequence to use')
     parser.add_argument('--seqlength', type=int, default=27, help='The initial length of the biological sequence')
 
-
     # Model specific options
-    parser.add_argument('--1cnn-layers', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
-    parser.add_argument('--2cnn-layers', default=[20,10,5,10,10,13], type=int, nargs='+', help='Number of layers to use.')
-    parser.add_argument('--layers-size', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--conv-layers-sizes1', default=[20,10,5,10,5,14], type=int, nargs='+', help='Layers for the tcr cnn')
+    parser.add_argument('--conv-layers-sizes2', default=[20,10,5,10,10,13], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--mlp-layers-size1', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--mlp-layers-size2', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--mlp-layers-size3', default=[25, 10], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--seqlength1', default=27, type=int, help = 'Max size of the TCR')
+    parser.add_argument('--seqlength1', default=30, type=int, help = 'Max size of the peptide')
     parser.add_argument('--emb-size', default=10, type=int, help='The size of the feature vector')
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')
     parser.add_argument('--loss', choices=['NLL'], default = 'NLL', help='The cost function to use')
