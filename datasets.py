@@ -7,7 +7,7 @@ import pandas as pd
 
 
 class TCRDataset(Dataset):
-    """TCR CDR3 dataset"""
+    """TCR CDR3 dataset for the DIM-TCR"""
 
     def __init__(self,root_dir='.',save_dir='.', data_file='data.npy',
                  data_suffix = '_gd', data_type = '_tcr'):
@@ -35,7 +35,7 @@ class TCRDataset(Dataset):
         return info
 
 class TCRclassify(Dataset):
-    """TCR CDR3 dataset"""
+    """TCR CDR3 dataset for the CNN classifier"""
 
     def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
         self.root_dir = root_dir
@@ -62,7 +62,7 @@ class TCRclassify(Dataset):
         return info
 
 class TCRautoencoder(Dataset):
-    """TCR CDR3 dataset"""
+    """TCR CDR3 only dataset"""
 
     def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
         self.root_dir = root_dir
@@ -88,7 +88,7 @@ class TCRautoencoder(Dataset):
 
 
 class TCRPepcontrastive(Dataset):
-    """TCR -pep contrastive"""
+    """Dataset for the fullDIM (TCR -pep) contrastive loss"""
 
     def __init__(self,root_dir='.',save_dir='.', data_file='data.npy', data_suffix = '_gd'):
         self.root_dir = root_dir
@@ -116,6 +116,9 @@ class TCRPepcontrastive(Dataset):
 
 
 def get_dataset(opt, exp_dir):
+    '''
+    This function initializes the specific dataset.
+    '''
 
     if opt.dataset == 'tcr':
         dataset = TCRDataset(root_dir=opt.data_dir, save_dir =exp_dir,data_file = opt.data_file,

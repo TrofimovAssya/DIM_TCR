@@ -24,7 +24,9 @@ def build_parser():
     ### Dataset specific options
     parser.add_argument('--data-dir', default='./data/', help='The folder contaning the dataset.')
     parser.add_argument('--data-file', default='.', help='The data file with the dataset.')
-    parser.add_argument('--dataset', choices=['tcr'], default='tcr', help='Which dataset to use.')
+    parser.add_argument('--dataset',
+                        choices=['tcr','classify','ae','contrastive'],
+                        default='tcr', help='Which dataset to use.')
     parser.add_argument('--suffix', type=str, default='_gd', help='Which dataset suffix to use')
     parser.add_argument('--datatype', type=str, default='_tcr', help='Which biological sequence to use')
     parser.add_argument('--seqlength', type=int, default=27, help='The initial length of the biological sequence')
@@ -37,10 +39,22 @@ def build_parser():
     parser.add_argument('--out-channels', default=5, type=int, help='The number of kernels on the last layer')
     parser.add_argument('--loss', choices=['NLL'], default = 'NLL', help='The cost function to use')
     parser.add_argument('--weight-decay', default=1e-5, type=float, help='The size of the embeddings.')
-    parser.add_argument('--model', choices=['CNN'], default='CNN', help='Which sequence model to use.')
+    parser.add_argument('--model', choices=['CNN', 'DIM', 'fullDIM','CNNae'], default='CNN', 
+                        help='Which sequence model to use.')
     parser.add_argument('--cpu', action='store_true', help='If we want to run on cpu.')
     parser.add_argument('--name', type=str, default=None, help="If we want to add a random str to the folder.")
     parser.add_argument('--gpu-selection', type=int, default=0, help="selectgpu")
+
+    #fullDIM specific options
+
+    parser.add_argument('--conv-layers-sizes1', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--conv-layers-sizes2', default=[20,10,5,10,5,14], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--mlp-layers-size1', default=[25,10], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--mlp-layers-size2', default=[25,10], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--mlp-layers-size3', default=[25,10], type=int, nargs='+', help='Number of layers to use.')
+    parser.add_argument('--seqlength1', type=int, default=27, help='The initial length of the biological sequence')
+    parser.add_argument('--seqlength2', type=int, default=34, help='The initial length of the biological sequence')
+
 
 
     # Monitoring options
