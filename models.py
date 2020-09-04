@@ -10,71 +10,26 @@ class DeepInfoMax(nn.Module):
     def __init__(self, nb_samples=1, conv_layers_sizes = [20,10,5,10,5,14],mlp_layers_size = [25,10], emb_size = 10,data_dir ='.', seqlength = 27):
         super(DeepInfoMax, self).__init__()
 
-        #self.sample = nb_samples
-        #self.emb_size = emb_size
-
-        ## adding on the conv layers
-        #if len(conv_layers_sizes)>=3:
-        #    self.conv1 = nn.Conv1d(in_channels = conv_layers_sizes[0],out_channels = conv_layers_sizes[1],kernel_size = conv_layers_sizes[2],stride = 1)
-        #    self.cnn_stack = 1
-        #if len(conv_layers_sizes)>=6:
-        #    self.conv2 = nn.Conv1d(in_channels = conv_layers_sizes[3],out_channels = conv_layers_sizes[4], kernel_size=conv_layers_sizes[5],stride = 1)
-        #    self.cnn_stack = 2
-        #if len(conv_layers_sizes)>=9:
-        #    self.conv3 = nn.Conv1d(in_channels = conv_layers_sizes[6],out_channels = conv_layers_sizes[7], kernel_size=conv_layers_sizes[8],stride = 1)
-        #    self.cnn_stack = 3
-        #if len(conv_layers_sizes)>=12:
-        #    self.conv4 = nn.Conv1d(in_channels = conv_layers_sizes[9],out_channels = conv_layers_sizes[10], kernel_size=conv_layers_sizes[11],stride = 1)
-        #    self.cnn_stack = 4
-        #if len(conv_layers_sizes)>=15:
-        #    self.conv5 = nn.Conv1d(in_channels = conv_layers_sizes[12],out_channels = conv_layers_sizes[13], kernel_size=conv_layers_sizes[14],stride = 1)
-        #    self.cnn_stack = 5
-
-        #layers = []
-        #diself.sample = nb_samples
         self.emb_size = emb_size
         self.seqlength = seqlength
+        self.class_number = class_number
 
         ## adding on the conv layers
-        if len(conv_layers_sizes)>=3:
-            self.conv1 = nn.Conv1d(in_channels = conv_layers_sizes[0],out_channels = conv_layers_sizes[1],kernel_size = conv_layers_sizes[2],stride = 1)
-            self.cnn_stack = 1
-            outsize = self.seqlength-conv_layers_sizes[2]+1
-            dim1 = [(conv_layers_sizes[1]*(outsize))]
-            print (dim1)
-        if len(conv_layers_sizes)>=6:
-            self.conv2 = nn.Conv1d(in_channels = conv_layers_sizes[3],out_channels = conv_layers_sizes[4], kernel_size=conv_layers_sizes[5],stride = 1)
-            self.cnn_stack = 2
-            outsize = outsize-conv_layers_sizes[5]+1
-            dim = [conv_layers_sizes[4]*(outsize)+dim1[0]]
-            print (dim)
-        if len(conv_layers_sizes)>=9:
-            self.conv3 = nn.Conv1d(in_channels = conv_layers_sizes[6],out_channels = conv_layers_sizes[7], kernel_size=conv_layers_sizes[8],stride = 1)
-            self.cnn_stack = 3
-            outsize = outsize-conv_layers_sizes[8]+1
-            dim = [(conv_layers_sizes[7]*outsize)+dim1[0]]
-            print (dim)
-        if len(conv_layers_sizes)>=12:
-            self.conv4 = nn.Conv1d(in_channels = conv_layers_sizes[9],out_channels = conv_layers_sizes[10], kernel_size=conv_layers_sizes[11],stride = 1)
-            self.cnn_stack = 4
-            outsize = outsize-conv_layers_sizes[11]+1
-            dim = [(conv_layers_sizes[10]*outsize)+dim1[0]]
-            print (dim)
-        if len(conv_layers_sizes)>=15:
-            self.conv5 = nn.Conv1d(in_channels = conv_layers_sizes[12],out_channels = conv_layers_sizes[13], kernel_size=conv_layers_sizes[14],stride = 1)
-            self.cnn_stack = 5
-            outsize = outsize-conv_layers_sizes[14]+1
-            dim = [(conv_layers_sizes[13]*outsize)+dim1[0]]
-            print (dim)
-
-        #self.conv1 = nn.Conv1d(in_channels = 20,out_channels = 10,kernel_size = 5,stride = 1)
-        #self.conv2 = nn.Conv1d(in_channels = 10,out_channels = self.out_channels, kernel_size=14,stride = 1)
         layers = []
-        self.dim = dim
-        #dim = [(10*(27-5+1))+self.out_channels*self.emb_size] + layers_size # Adding the emb size*out_channels
-        dim = dim + mlp_layers_size # Adding the emb size*out_channels
+        outsize = 27 
 
-        #m = [(conv_layers_sizes[1]*(27-conv_layers_sizes[2]+1))+self.emb_size] + mlp_layers_size # Adding the emb size*out_channels
+        for i in range(0,len(conv_layers_sizes),3):
+            layer = nn.Conv1d(in_channels = conv_layers_sizes[i+0],out_channels = conv_layers_sizes[i+1],kernel_size = conv_layers_sizes[i+2],stride = 1)
+            outsize = outsize-conv_layers_sizes[i+2]+1
+            layers.append(layer)
+            dim1 = [(conv_layers_sizes[i+1]*(outsize))]
+
+        self.conv_stack = nn.ModuleList(layers)
+        dim1 = dim1[0]
+        if not dim1==emb_size:
+            import pdb; pdb.set_trace()
+
+        dim = dim + mlp_layers_size # Adding the emb size*out_channels
 
         for size_in, size_out in zip(dim[:-1], dim[1:]):
             layer = nn.Linear(size_in, size_out)
@@ -83,32 +38,23 @@ class DeepInfoMax(nn.Module):
         self.mlp_layers = nn.ModuleList(layers)
 
         # Last layer
-        self.last_layer = nn.Linear(dim[-1], 2)
-        self.softmax = nn.Softmax(dim=1)
-
+        self.last_layer = nn.Linear(dim[-1], self.class_number)
+        #self.softmax = nn.Softmax(dim=1)
 
     def get_feature_map(self, x1):
+        fm = self.tcr_conv_stack[0](x1)
 
-        fm = self.conv1(x1)
         fm = fm.reshape((fm.shape[0], fm.shape[1]*fm.shape[2]))
         return fm
 
-    def get_feature_vector(self, x1):
+    def get_feature_vector(self, tcr):
 
-        fv = self.conv1(x1)
-        if self.cnn_stack >1:
-            fv = self.conv2(fv)
-        if self.cnn_stack >2:
-            fv = self.conv3(fv)
-        if self.cnn_stack >3:
-            fv = self.conv4(fv)
-        if self.cnn_stack >4:
-            fv = self.conv5(fv)
+        for layer in self.tcr_conv_stack:
+            tcr = layer(tcr)
 
-        #import pdb; pdb.set_trace()
+        tcr = tcr.reshape((tcr.shape[0], tcr.shape[1]*tcr.shape[2]))
+        return tcr
 
-        fv = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
-        return fv
 
     def forward(self,  x1, x2):
 
@@ -123,7 +69,7 @@ class DeepInfoMax(nn.Module):
             mlp_input_1 = layer(mlp_input_1)
             mlp_input_1 = F.tanh(mlp_input_1)
         mlp_output_1 = self.last_layer(mlp_input_1)
-        mlp_output_1 = self.softmax(mlp_output_1)
+        mlp_output_1 = F.log_softmax(mlp_output_1)
 
         # Forward pass for fake
         mlp_input_2 = torch.cat([fm2, fv1], 1)
@@ -131,7 +77,7 @@ class DeepInfoMax(nn.Module):
             mlp_input_2 = layer(mlp_input_2)
             mlp_input_2 = F.tanh(mlp_input_2)
         mlp_output_2 = self.last_layer(mlp_input_2)
-        mlp_output_2 = self.softmax(mlp_output_2)
+        mlp_output_2 = F.log_softmax(mlp_output_2)
 
 
         return mlp_output_1, mlp_output_2
@@ -147,42 +93,20 @@ class CNNClassifier(nn.Module):
         self.class_number = class_number
 
         ## adding on the conv layers
-        if len(conv_layers_sizes)>=3:
-            self.conv1 = nn.Conv1d(in_channels = conv_layers_sizes[0],out_channels = conv_layers_sizes[1],kernel_size = conv_layers_sizes[2],stride = 1)
-            self.cnn_stack = 1
-            outsize = 27-conv_layers_sizes[2]+1
-            dim = [(conv_layers_sizes[1]*(outsize))]
-            print (dim)
-        if len(conv_layers_sizes)>=6:
-            self.conv2 = nn.Conv1d(in_channels = conv_layers_sizes[3],out_channels = conv_layers_sizes[4], kernel_size=conv_layers_sizes[5],stride = 1)
-            self.cnn_stack = 2
-            outsize = outsize-conv_layers_sizes[5]+1
-            dim = [conv_layers_sizes[4]*(outsize)]
-            print (dim)
-        if len(conv_layers_sizes)>=9:
-            self.conv3 = nn.Conv1d(in_channels = conv_layers_sizes[6],out_channels = conv_layers_sizes[7], kernel_size=conv_layers_sizes[8],stride = 1)
-            self.cnn_stack = 3
-            outsize = outsize-conv_layers_sizes[8]+1
-            dim = [(conv_layers_sizes[7]*outsize)]
-            print (dim)
-        if len(conv_layers_sizes)>=12:
-            self.conv4 = nn.Conv1d(in_channels = conv_layers_sizes[9],out_channels = conv_layers_sizes[10], kernel_size=conv_layers_sizes[11],stride = 1)
-            self.cnn_stack = 4
-            outsize = outsize-conv_layers_sizes[11]+1
-            dim = [(conv_layers_sizes[10]*outsize)]
-            print (dim)
-        if len(conv_layers_sizes)>=15:
-            self.conv5 = nn.Conv1d(in_channels = conv_layers_sizes[12],out_channels = conv_layers_sizes[13], kernel_size=conv_layers_sizes[14],stride = 1)
-            self.cnn_stack = 5
-            outsize = outsize-conv_layers_sizes[14]+1
-            dim = [(conv_layers_sizes[13]*outsize)]
-            print (dim)
-
-        #self.conv1 = nn.Conv1d(in_channels = 20,out_channels = 10,kernel_size = 5,stride = 1)
-        #self.conv2 = nn.Conv1d(in_channels = 10,out_channels = self.out_channels, kernel_size=14,stride = 1)
         layers = []
-        self.dim = dim
-        #dim = [(10*(27-5+1))+self.out_channels*self.emb_size] + layers_size # Adding the emb size*out_channels
+        outsize = 27 
+
+        for i in range(0,len(conv_layers_sizes),3):
+            layer = nn.Conv1d(in_channels = conv_layers_sizes[i+0],out_channels = conv_layers_sizes[i+1],kernel_size = conv_layers_sizes[i+2],stride = 1)
+            outsize = outsize-conv_layers_sizes[i+2]+1
+            layers.append(layer)
+            dim1 = [(conv_layers_sizes[i+1]*(outsize))]
+
+        self.conv_stack = nn.ModuleList(layers)
+        dim1 = dim1[0]
+        if not dim1==emb_size:
+            import pdb; pdb.set_trace()
+
         dim = dim + mlp_layers_size # Adding the emb size*out_channels
 
         for size_in, size_out in zip(dim[:-1], dim[1:]):
@@ -193,24 +117,18 @@ class CNNClassifier(nn.Module):
 
         # Last layer
         self.last_layer = nn.Linear(dim[-1], self.class_number)
-        # self.softmax = nn.Softmax(dim=1)
+        #self.softmax = nn.Softmax(dim=1)
 
 
-    def get_feature_vector(self, x1):
+    def get_feature_vector(self, tcr):
 
-        fv = self.conv1(x1)
-        if self.cnn_stack >1:
-            fv = self.conv2(fv)
-        if self.cnn_stack >2:
-            fv = self.conv3(fv)
-        if self.cnn_stack >3:
-            fv = self.conv4(fv)
-        if self.cnn_stack >4:
-            fv = self.conv5(fv)
+        for layer in self.tcr_conv_stack:
+            tcr = layer(tcr)
+
+        tcr = tcr.reshape((tcr.shape[0], tcr.shape[1]*tcr.shape[2]))
+        return tcr
 
 
-        fv = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
-        return fv
 
     def forward(self,  x1):
 
@@ -230,73 +148,59 @@ class CNNClassifier(nn.Module):
 
         return mlp_output
 
+
+
 class CNNAutoEncoder(nn.Module):
+
 
     def __init__(self, conv_layers_sizes = [20,10,15,10,5,12], emb_size = 10, data_dir ='.'):
         super(CNNAutoEncoder, self).__init__()
 
+        layers_conv = []
+        layers_deconv = []
+        outsize = 27 
 
-        ## adding on the conv layers
-        if len(conv_layers_sizes)>=3:
-            self.conv1 = nn.Conv1d(in_channels = conv_layers_sizes[0],out_channels = conv_layers_sizes[1],kernel_size = conv_layers_sizes[2],stride = 1)
-            self.deconv1 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[1],out_channels = conv_layers_sizes[0],kernel_size = conv_layers_sizes[2],stride = 1)
-            self.cnn_stack = 1
+        for i in range(0,len(conv_layers_sizes),3):
+            layer = nn.Conv1d(in_channels = conv_layers_sizes[i+0],
+                              out_channels = conv_layers_sizes[i+1],
+                              kernel_size = conv_layers_sizes[i+2],stride = 1)
+            outsize = outsize-conv_layers_sizes[i+2]+1
+            layers_conv.append(layer)
+            dim1 = [(conv_layers_sizes[i+1]*(outsize))]
 
-        if len(conv_layers_sizes)>=6:
-            self.conv2 = nn.Conv1d(in_channels = conv_layers_sizes[3],out_channels = conv_layers_sizes[4], kernel_size=conv_layers_sizes[5],stride = 1)
-            self.deconv2 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[4],out_channels = conv_layers_sizes[3],kernel_size = conv_layers_sizes[5],stride = 1)
-            self.cnn_stack = 2
-        if len(conv_layers_sizes)>=9:
-            self.conv3 = nn.Conv1d(in_channels = conv_layers_sizes[6],out_channels = conv_layers_sizes[7], kernel_size=conv_layers_sizes[8],stride = 1)
-            self.deconv3 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[7],out_channels = conv_layers_sizes[6],kernel_size = conv_layers_sizes[8],stride = 1)
-            self.cnn_stack = 3
-        if len(conv_layers_sizes)>=12:
-            self.conv4 = nn.Conv1d(in_channels = conv_layers_sizes[9],out_channels = conv_layers_sizes[10], kernel_size=conv_layers_sizes[11],stride = 1)
-            self.deconv4 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[10],out_channels = conv_layers_sizes[9],kernel_size = conv_layers_sizes[11],stride = 1)
-            self.cnn_stack = 4
-        if len(conv_layers_sizes)>=15:
-            self.conv5 = nn.Conv1d(in_channels = conv_layers_sizes[12],out_channels = conv_layers_sizes[13], kernel_size=conv_layers_sizes[14],stride = 1)
-            self.deconv5 = nn.ConvTranspose1d(in_channels = conv_layers_sizes[13],out_channels = conv_layers_sizes[12],kernel_size = conv_layers_sizes[14],stride = 1)
-            self.cnn_stack = 5
+            layer = nn.ConvTranspose1d(in_channels =
+                                       conv_layers_sizes[i+1],
+                                       out_channels = conv_layers_sizes[i+0],
+                                       kernel_size = conv_layers_sizes[i+2],stride = 1)
+            layers_deconv.append(layer)
 
+        self.conv_stack = nn.ModuleList(layers)
+        dim1 = dim1[0]
+        if not dim1==emb_size:
+            import pdb; pdb.set_trace()
+
+        self.conv_stack = nn.ModuleList(layers_conv)
+        self.deconv_stack = nn.ModuleList(layers_deconv)
 
 
-    def encode(self, x1):
 
-        fv = self.conv1(x1)
-        if self.cnn_stack>1:
-            fv = self.conv2(fv)
-        if self.cnn_stack >2:
-            fv = self.conv3(fv)
-        if self.cnn_stack >3:
-            fv = self.conv4(fv)
-        if self.cnn_stack >4:
-            fv = self.conv5(fv)
+    def encode(self, tcr):
 
-        #import pdb; pdb.set_trace()
+        for layer in self.conv_stack:
+            tcr = layer(tcr)
 
-        #fv = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
-        return fv
+        return tcr
 
-    def decode(self, fv):
 
-        if self.cnn_stack >4:
-            fv = self.deconv5(fv)
-        if self.cnn_stack >3:
-            fv = self.deconv4(fv)
-        if self.cnn_stack >2:
-            fv = self.deconv3(fv)
-        if self.cnn_stack >1:
-            fv = self.deconv2(fv)
+    def dencode(self, tcr):
 
-        fv = self.deconv1(fv)
-        output = fv
-        #output = fv.reshape((fv.shape[0], fv.shape[1]*fv.shape[2]))
-        return output
+        for layer in self.conv_stack[::-1]:
+            tcr = layer(tcr)
+
+        return tcr
 
     def forward(self,  x1):
 
-        # Get the feature maps
 
         fv = self.encode(x1)
         self.fv = fv
@@ -337,44 +241,20 @@ class FullDIM(nn.Module):
 
 
     def get_cnn_stack(self, conv_layers_sizes, seqlength):
-        cnn_stack = []
+        layers = []
         stack_size = 0
+        outsize = seqlength
         ## adding on the conv layers
-        if len(conv_layers_sizes)>=3:
-            conv1 = nn.Conv1d(in_channels = conv_layers_sizes[0],out_channels = conv_layers_sizes[1],kernel_size = conv_layers_sizes[2],stride = 1)
-            cnn_stack.append(conv1)
-            stack_size = 1
-            outsize = seqlength-conv_layers_sizes[2]+1
-            dim = [(conv_layers_sizes[1]*(outsize))]
-            print (dim)
-        if len(conv_layers_sizes)>=6:
-            conv2 = nn.Conv1d(in_channels = conv_layers_sizes[3],out_channels = conv_layers_sizes[4], kernel_size=conv_layers_sizes[5],stride = 1)
-            cnn_stack.append(conv2)
-            stack_size = 2
-            outsize = outsize-conv_layers_sizes[5]+1
-            dim = [conv_layers_sizes[4]*(outsize)+dim1[0]]
-            print (dim)
-        if len(conv_layers_sizes)>=9:
-            conv3 = nn.Conv1d(in_channels = conv_layers_sizes[6],out_channels = conv_layers_sizes[7], kernel_size=conv_layers_sizes[8],stride = 1)
-            cnn_stack.append(conv3)
-            stack_size = 3
-            outsize = outsize-conv_layers_sizes[8]+1
-            dim = [(conv_layers_sizes[7]*outsize)+dim1[0]]
-            print (dim)
-        if len(conv_layers_sizes)>=12:
-            conv4 = nn.Conv1d(in_channels = conv_layers_sizes[9],out_channels = conv_layers_sizes[10], kernel_size=conv_layers_sizes[11],stride = 1)
-            cnn_stack.append(conv4)
-            stack_size = 4
-            outsize = outsize-conv_layers_sizes[11]+1
-            dim = [(conv_layers_sizes[10]*outsize)+dim1[0]]
-            print (dim)
-        if len(conv_layers_sizes)>=15:
-            conv5 = nn.Conv1d(in_channels = conv_layers_sizes[12],out_channels = conv_layers_sizes[13], kernel_size=conv_layers_sizes[14],stride = 1)
-            cnn_stack.append(conv5)
-            stack_size = 5
-            outsize = outsize-conv_layers_sizes[14]+1
-            dim = [(conv_layers_sizes[13]*outsize)+dim1[0]]
-            print (dim)
+        for i in range(0,len(conv_layers_sizes),3):
+            layer = nn.Conv1d(in_channels = conv_layers_sizes[i+0],
+                              out_channels = conv_layers_sizes[i+1],
+                              kernel_size = conv_layers_sizes[i+2],stride = 1)
+            outsize = outsize-conv_layers_sizes[i+2]+1
+            layers.append(layer)
+            dim2 = [(conv_layers_sizes[i+1]*(outsize))]
+
+        cnn_stack = nn.ModuleList(layers)
+
 
         return cnn_stack, outsize
 
@@ -451,9 +331,6 @@ def get_model(opt, inputs_size, model_state=None):
     elif opt.model == 'ae':
         model_class = CNNAutoEncoder
         model = model_class(conv_layers_sizes = opt.cnn_layers, emb_size=opt.emb_size, data_dir = opt.data_dir)
-    elif opt.model == 'full':
-        model_class = Contrastive
-        model = model_class(mlp_layers_sizes = opt.cnn_layers, emb_size=opt.emb_size, data_dir = opt.data_dir)
     elif opt.model == 'fullDIM':
         model_class = FullDIM
         model = model_class(conv_layers_sizes1 = opt.conv_layers_sizes1,
